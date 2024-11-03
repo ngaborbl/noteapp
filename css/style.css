@@ -258,7 +258,7 @@ body.dark select {
     border-color: #666;
 }
 
-* Reszponzív beállítások kisebb képernyőkre */
+/* Reszponzív beállítások kisebb képernyőkre */
 @media (max-width: 600px) {
     .header-top {
         flex-wrap: wrap;
@@ -292,4 +292,27 @@ body.dark select {
     .dashboard-grid {
         grid-template-columns: 1fr;
     }
+}
+
+/* Új stílusok a beállításokhoz */
+.settings-group {
+  margin-bottom: 1.5rem;
+}
+
+.settings-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: bold;
+}
+
+.settings-group select {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+#settings-form button {
+  margin-top: 1rem;
+  width: 100%;
 }

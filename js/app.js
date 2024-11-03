@@ -56,28 +56,35 @@ function initializeMessaging() {
   }
 }
 
-// Értesítési függvény
+// Időpont hozzáadásánál és szerkesztésénél
 async function sendNotification(userId, appointmentTitle, appointmentTime, notifyBefore) {
+  const notificationCount = parseInt(localStorage.getItem('notificationCount') || '1');
+  const notificationTime = parseInt(localStorage.getItem('notificationTime') || '30');
+  
   try {
-    const response = await fetch('https://noteapp-pwa.vercel.app/api/sendNotification', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        userId,
-        appointmentTitle,
-        appointmentTime,
-        notifyBefore,
-      }),
-    });
+    // Értesítések küldése a beállított számban
+    for(let i = 0; i < notificationCount; i++) {
+      const response = await fetch('https://noteapp-pwa.vercel.app/api/sendNotification', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId,
+          appointmentTitle,
+          appointmentTime,
+          // Különböző időpontokban küldjük az értesítéseket
+          notifyBefore: notificationTime * (i + 1)
+        }),
+      });
 
-    if (!response.ok) {
-      throw new Error('Hiba történt az értesítés küldése közben');
+      if (!response.ok) {
+        throw new Error('Hiba történt az értesítés küldése közben');
+      }
+
+      const data = await response.json();
+      console.log(`${i + 1}. értesítés sikeresen beállítva:`, data);
     }
-
-    const data = await response.json();
-    console.log('Értesítés sikeresen elküldve:', data);
   } catch (error) {
     console.error('Hiba:', error);
   }
@@ -494,28 +501,65 @@ function loadSettings() {
   contentElement.innerHTML = `
     <h2>Beállítások</h2>
     <form id="settings-form">
-      <label for="theme-select">Téma:</label>
-      <select id="theme-select">
-        <option value="light">Világos</option>
-        <option value="dark">Sötét</option>
-      </select>
+      <div class="settings-group">
+        <label for="theme-select">Téma:</label>
+        <select id="theme-select">
+          <option value="light">Világos</option>
+          <option value="dark">Sötét</option>
+        </select>
+      </div>
+      
+      <div class="settings-group">
+        <label for="notification-time">Értesítés küldése az időpont előtt:</label>
+        <select id="notification-time">
+          <option value="15">15 perc</option>
+          <option value="30">30 perc</option>
+          <option value="60">1 óra</option>
+        </select>
+      </div>
+      
+      <div class="settings-group">
+        <label for="notification-count">Értesítések száma:</label>
+        <select id="notification-count">
+          <option value="1">1 értesítés</option>
+          <option value="2">2 értesítés</option>
+          <option value="3">3 értesítés</option>
+        </select>
+      </div>
+      
       <button type="submit">Mentés</button>
     </form>
   `;
+  
+  // Események kezelése
   document.getElementById('settings-form').addEventListener('submit', saveSettings);
   
-  // Aktuális téma betöltése
+  // Jelenlegi beállítások betöltése
   const currentTheme = localStorage.getItem('theme') || 'light';
+  const notificationTime = localStorage.getItem('notificationTime') || '30';
+  const notificationCount = localStorage.getItem('notificationCount') || '1';
+  
   document.getElementById('theme-select').value = currentTheme;
+  document.getElementById('notification-time').value = notificationTime;
+  document.getElementById('notification-count').value = notificationCount;
 }
 
 // Beállítások mentése
 function saveSettings(e) {
   e.preventDefault();
   const theme = document.getElementById('theme-select').value;
+  const notificationTime = document.getElementById('notification-time').value;
+  const notificationCount = document.getElementById('notification-count').value;
+  
+  // Beállítások mentése
   localStorage.setItem('theme', theme);
+  localStorage.setItem('notificationTime', notificationTime);
+  localStorage.setItem('notificationCount', notificationCount);
+  
+  // Téma alkalmazása
   applyTheme(theme);
-  alert('Beállítások mentve!');
+  
+  alert('Beállítások sikeresen mentve!');
 }
 
 // Téma alkalmazása
@@ -538,26 +582,8 @@ function showLoginForm() {
       <input type="password" id="login-password" placeholder="Jelszó" required>
       <button type="submit">Bejelentkezés</button>
     </form>
-    <p>Nincs még fiókod? <a href="#" id="show-register">Regisztrálj itt</a></p>
   `;
   document.getElementById('login-form').addEventListener('submit', login);
-  document.getElementById('show-register').addEventListener('click', showRegisterForm);
-}
-
-// Regisztrációs űrlap megjelenítése
-function showRegisterForm() {
-  const contentElement = document.getElementById('content');
-  contentElement.innerHTML = `
-    <h2>Regisztráció</h2>
-    <form id="register-form">
-      <input type="email" id="register-email" placeholder="Email cím" required>
-      <input type="password" id="register-password" placeholder="Jelszó" required>
-      <button type="submit">Regisztráció</button>
-    </form>
-    <p>Már van fiókod? <a href="#" id="show-login">Jelentkezz be itt</a></p>
-  `;
-  document.getElementById('register-form').addEventListener('submit', register);
-  document.getElementById('show-login').addEventListener('click', showLoginForm);
 }
 
 // Bejelentkezés
@@ -573,22 +599,6 @@ function login(e) {
     .catch((error) => {
       console.error("Bejelentkezési hiba:", error.message);
       alert('Bejelentkezési hiba: ' + error.message);
-    });
-}
-
-// Regisztráció
-function register(e) {
-  e.preventDefault();
-  const email = document.getElementById('register-email').value;
-  const password = document.getElementById('register-password').value;
-
-  auth.createUserWithEmailAndPassword(email, password)
-    .then((userCredential) => {
-      console.log("Sikeres regisztráció");
-    })
-    .catch((error) => {
-      console.error("Regisztrációs hiba:", error.message);
-      alert('Regisztrációs hiba: ' + error.message);
     });
 }
 
