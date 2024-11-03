@@ -29,10 +29,11 @@ function initializeNotifications() {
 
 // Helyi értesítések kezelése
 function setupLocalNotifications() {
-  // Értesítések ellenőrzése rendszeresen
+  console.log('Értesítések figyelése elindítva');
+  // Értesítések ellenőrzése gyakrabban
   setInterval(() => {
     checkUpcomingAppointments();
-  }, 60000); // 1 percenként ellenőriz
+  }, 30000); // 30 másodpercenként ellenőriz
 }
 
 // Közelgő időpontok ellenőrzése
@@ -40,15 +41,29 @@ async function checkUpcomingAppointments() {
   const now = new Date();
   const notificationTime = parseInt(localStorage.getItem('notificationTime') || '30');
   
+  console.log('Időpontok ellenőrzése:', {
+    currentTime: now.toLocaleString(),
+    notificationTime: notificationTime
+  });
+
   try {
     const snapshot = await db.collection('appointments')
       .where('date', '>', now)
       .get();
 
+    console.log('Talált időpontok száma:', snapshot.size);
+
     snapshot.forEach(doc => {
       const appointment = doc.data();
       const appointmentDate = appointment.date.toDate();
       const timeDiff = (appointmentDate - now) / (1000 * 60); // percben
+
+      console.log('Időpont ellenőrzése:', {
+        title: appointment.title,
+        date: appointmentDate.toLocaleString(),
+        timeDiff: Math.round(timeDiff),
+        shouldNotify: timeDiff <= notificationTime && timeDiff > 0
+      });
 
       if (timeDiff <= notificationTime && timeDiff > 0) {
         showLocalNotification(
@@ -65,16 +80,28 @@ async function checkUpcomingAppointments() {
 // Helyi értesítés megjelenítése
 function showLocalNotification(title, body) {
   if (Notification.permission === 'granted') {
-    const notification = new Notification(title, {
-      body: body,
-      icon: '/icons/notification-icon.png',
-      requireInteraction: true
-    });
+    console.log('Értesítés küldése:', { title, body });
+    
+    try {
+      const notification = new Notification(title, {
+        body: body,
+        requireInteraction: true,
+        tag: 'appointment-notification', // Egyedi azonosító
+        renotify: true // Újraértesítés engedélyezése
+      });
 
-    notification.onclick = function() {
-      window.focus();
-      this.close();
-    };
+      notification.onclick = function() {
+        console.log('Értesítésre kattintás');
+        window.focus();
+        this.close();
+      };
+
+      console.log('Értesítés sikeresen létrehozva');
+    } catch (error) {
+      console.error('Hiba az értesítés létrehozásakor:', error);
+    }
+  } else {
+    console.log('Értesítések nincsenek engedélyezve');
   }
 }
 
@@ -344,11 +371,11 @@ function addAppointment(e) {
       })
       .then((docRef) => {
         console.log('Időpont sikeresen hozzáadva');
-        
-        // Helyi értesítés beállítása
+      
+        // Azonnali értesítés az időpont létrehozásáról
         showLocalNotification(
           'Új időpont létrehozva',
-          `${title} - ${dateTime.toLocaleString('hu-HU')}`
+          `${title} időpont létrehozva: ${dateTime.toLocaleString('hu-HU')}`
         );
         
         // Form tisztítása
