@@ -14,83 +14,67 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 const auth = firebase.auth();
 
-// A Firebase Messaging inicializálása és token kezelés
-function initializeMessaging() {
-  try {
-    const messaging = firebase.messaging();
-    
-    // Először ellenőrizzük, hogy támogatja-e a böngésző a push notificationt
-    if ('Notification' in window) {
-      // Engedély kérése és token kezelése
-      Notification.requestPermission()
-        .then((permission) => {
-          if (permission === 'granted') {
-            console.log('Értesítési engedély megadva');
-            
-            // Token lekérése - új API használata
-            return messaging.getToken({
-              vapidKey: "BMClsjpGPsNjgxNlIC6vyY6q5bh2wv9xDCWeAD0bc8JX2l13zAwOXxxJzeQpchTz9YYwEKwH5xQ9LqZO8Vv0rZg"
-            });
-          } else {
-            throw new Error('Értesítési engedély megtagadva');
-          }
-        })
-        .then((token) => {
-          if (token) {
-            console.log('FCM Token:', token);
-            
-            // Token mentése a felhasználóhoz az adatbázisban
-            if (auth.currentUser) {
-              return db.collection('users').doc(auth.currentUser.uid).update({
-                fcmToken: token
-              });
-            }
-          }
-        })
-        .catch((error) => {
-          console.error('Hiba a messaging inicializálásakor:', error);
-        });
-    }
-  } catch (error) {
-    console.error('Firebase Messaging inicializálási hiba:', error);
+// Egyszerű értesítési rendszer
+function initializeNotifications() {
+  if ('Notification' in window) {
+    Notification.requestPermission()
+      .then(permission => {
+        if (permission === 'granted') {
+          console.log('Értesítési engedély megadva');
+          setupLocalNotifications();
+        }
+      });
   }
 }
 
-// Időpont hozzáadásánál és szerkesztésénél
-async function sendNotification(userId, appointmentTitle, appointmentTime, notifyBefore) {
-  const notificationCount = parseInt(localStorage.getItem('notificationCount') || '1');
+// Helyi értesítések kezelése
+function setupLocalNotifications() {
+  // Értesítések ellenőrzése rendszeresen
+  setInterval(() => {
+    checkUpcomingAppointments();
+  }, 60000); // 1 percenként ellenőriz
+}
+
+// Közelgő időpontok ellenőrzése
+async function checkUpcomingAppointments() {
+  const now = new Date();
   const notificationTime = parseInt(localStorage.getItem('notificationTime') || '30');
   
   try {
-    // Értesítések küldése a beállított számban
-    for(let i = 0; i < notificationCount; i++) {
-      const response = await fetch('https://noteapp-seven-silk.vercel.app/api/sendNotification', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type'
-        },
-        body: JSON.stringify({
-          userId,
-          appointmentTitle,
-          appointmentTime,
-          notifyBefore: notificationTime * (i + 1)
-        }),
-      });
+    const snapshot = await db.collection('appointments')
+      .where('date', '>', now)
+      .get();
 
-      if (!response.ok) {
-        throw new Error(`Hiba történt az értesítés küldése közben: ${response.status}`);
+    snapshot.forEach(doc => {
+      const appointment = doc.data();
+      const appointmentDate = appointment.date.toDate();
+      const timeDiff = (appointmentDate - now) / (1000 * 60); // percben
+
+      if (timeDiff <= notificationTime && timeDiff > 0) {
+        showLocalNotification(
+          'Közelgő időpont',
+          `${appointment.title} - ${appointmentDate.toLocaleString('hu-HU')}`
+        );
       }
-
-      const data = await response.json();
-      console.log(`${i + 1}. értesítés sikeresen beállítva:`, data);
-    }
+    });
   } catch (error) {
-    console.error('Értesítési hiba részletei:', error);
-    // Ne állítsuk meg a folyamatot hiba esetén
-    console.log('Az időpont mentésre került, de az értesítés beállítása nem sikerült');
+    console.error('Hiba az időpontok ellenőrzésekor:', error);
+  }
+}
+
+// Helyi értesítés megjelenítése
+function showLocalNotification(title, body) {
+  if (Notification.permission === 'granted') {
+    const notification = new Notification(title, {
+      body: body,
+      icon: '/icons/notification-icon.png',
+      requireInteraction: true
+    });
+
+    notification.onclick = function() {
+      window.focus();
+      this.close();
+    };
   }
 }
 
@@ -179,7 +163,7 @@ function loadUpcomingAppointments() {
       snapshot.forEach(doc => {
         const appointment = doc.data();
         const li = document.createElement('li');
-        li.textContent = `${appointment.title} - ${appointment.date.toDate().toLocaleString()}`;
+        li.textContent = `${appointment.title} - ${appointment.date.toDate().toLocaleString('hu-HU')}`;
         appointmentsList.appendChild(li);
       });
     })
@@ -271,79 +255,8 @@ function deleteNote(noteId) {
   }
 }
 
-// Új időpont hozzáadása vátozás
-function addAppointment(e) {
-  e.preventDefault();
-  console.log('Időpont hozzáadás kezdeményezve');
-  
-  const title = document.getElementById('appointment-title').value;
-  const date = document.getElementById('appointment-date').value;
-  const time = document.getElementById('appointment-time').value;
-
-  console.log('Bevitt adatok:', { title, date, time });
-
-  if (title && date && time) {
-    try {
-      const dateTime = new Date(date + 'T' + time);
-      console.log('Létrehozott dátum objektum:', dateTime);
-      
-      // Ellenőrizzük, hogy érvényes dátum-e
-      if (isNaN(dateTime.getTime())) {
-        throw new Error('Érvénytelen dátum vagy idő formátum');
-      }
-
-      const timestamp = firebase.firestore.Timestamp.fromDate(dateTime);
-      console.log('Firestore timestamp létrehozva:', timestamp);
-      
-      console.log('Dokumentum létrehozása kezdeményezve a Firestore-ban');
-      db.collection('appointments').add({
-        title: title,
-        date: timestamp,
-        status: 'pending',
-        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-        userId: auth.currentUser.uid // Adjuk hozzá a felhasználó ID-t is
-      })
-      .then((docRef) => {
-        console.log('Időpont sikeresen hozzáadva, dokumentum ID:', docRef.id);
-        
-        // Értesítés küldése
-        if (auth.currentUser) {
-          console.log('Értesítés küldése kezdeményezve');
-          const userId = auth.currentUser.uid;
-          return sendNotification(userId, title, dateTime.toISOString(), 30);
-        }
-      })
-      .then(() => {
-        console.log('Értesítés sikeresen elküldve');
-        
-        // Form tisztítása
-        document.getElementById('appointment-title').value = '';
-        document.getElementById('appointment-date').value = '';
-        document.getElementById('appointment-time').value = '';
-        
-        // Lista újratöltése
-        loadAppointments();
-        
-        // Felhasználói visszajelzés
-        alert('Időpont sikeresen létrehozva!');
-      })
-      .catch(error => {
-        console.error('Hiba az időpont mentésekor:', error);
-        alert('Hiba történt az időpont mentésekor: ' + error.message);
-      });
-    } catch (error) {
-      console.error('Hiba a dátum feldolgozásakor:', error);
-      alert('Érvénytelen dátum vagy idő formátum');
-    }
-  } else {
-    console.log('Hiányzó adatok:', { title, date, time });
-    alert('Kérlek töltsd ki az összes mezőt!');
-  }
-}
-
+// Időpontok betöltése
 function loadAppointments() {
-  console.log('Időpontok betöltése kezdeményezve');
-  
   const contentElement = document.getElementById('content');
   contentElement.innerHTML = `
     <h2>Időpontok</h2>
@@ -358,13 +271,12 @@ function loadAppointments() {
   document.getElementById('new-appointment-form').addEventListener('submit', addAppointment);
   
   const appointmentsList = document.getElementById('appointments-list');
-  console.log('Időpontok lekérése a Firestore-ból...');
+  const now = new Date();
   
   db.collection('appointments')
     .orderBy('date', 'asc')
     .get()
     .then(snapshot => {
-      console.log('Firestore válasz megérkezett, dokumentumok száma:', snapshot.size);
       appointmentsList.innerHTML = '';
       snapshot.forEach(doc => {
         const appointment = doc.data();
@@ -374,21 +286,7 @@ function loadAppointments() {
         let dateString = 'Érvénytelen dátum';
         try {
           if (appointment.date) {
-            let date;
-            if (appointment.date.toDate) {
-              // Ha Firestore Timestamp
-              date = appointment.date.toDate();
-            } else if (appointment.date.seconds) {
-              // Ha timestamp objektum
-              date = new Date(appointment.date.seconds * 1000);
-            } else if (typeof appointment.date === 'string') {
-              // Ha string
-              date = new Date(appointment.date);
-            } else {
-              // Ha egyéb formátum
-              date = new Date(appointment.date);
-            }
-            
+            const date = appointment.date.toDate();
             dateString = date.toLocaleString('hu-HU', {
               year: 'numeric',
               month: 'long',
@@ -398,7 +296,7 @@ function loadAppointments() {
             });
           }
         } catch (error) {
-          console.error('Hiba a dátum feldolgozásakor:', error, appointment.date);
+          console.error('Hiba a dátum feldolgozásakor:', error);
         }
 
         li.innerHTML = `
@@ -417,6 +315,61 @@ function loadAppointments() {
       console.error('Hiba az időpontok betöltésekor:', error);
       appointmentsList.innerHTML = '<li class="error">Hiba történt az időpontok betöltésekor.</li>';
     });
+}
+
+// Új időpont hozzáadása
+function addAppointment(e) {
+  e.preventDefault();
+  console.log('Időpont hozzáadás kezdeményezve');
+  
+  const title = document.getElementById('appointment-title').value;
+  const date = document.getElementById('appointment-date').value;
+  const time = document.getElementById('appointment-time').value;
+
+  if (title && date && time) {
+    try {
+      const dateTime = new Date(date + 'T' + time);
+      
+      if (isNaN(dateTime.getTime())) {
+        throw new Error('Érvénytelen dátum vagy idő formátum');
+      }
+
+      const timestamp = firebase.firestore.Timestamp.fromDate(dateTime);
+      
+      db.collection('appointments').add({
+        title: title,
+        date: timestamp,
+        status: 'pending',
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      })
+      .then((docRef) => {
+        console.log('Időpont sikeresen hozzáadva');
+        
+        // Helyi értesítés beállítása
+        showLocalNotification(
+          'Új időpont létrehozva',
+          `${title} - ${dateTime.toLocaleString('hu-HU')}`
+        );
+        
+        // Form tisztítása
+        document.getElementById('appointment-title').value = '';
+        document.getElementById('appointment-date').value = '';
+        document.getElementById('appointment-time').value = '';
+        
+        // Lista újratöltése
+        loadAppointments();
+      })
+      .catch(error => {
+        console.error('Hiba az időpont mentésekor:', error);
+        alert('Hiba történt az időpont mentésekor: ' + error.message);
+      });
+    } catch (error) {
+      console.error('Hiba a dátum feldolgozásakor:', error);
+      alert('Érvénytelen dátum vagy idő formátum');
+    }
+  } else {
+    alert('Kérlek töltsd ki az összes mezőt!');
+  }
 }
 
 // Időpont szerkesztése
@@ -444,7 +397,6 @@ function editAppointment(appointmentId) {
         try {
           const newDateTime = new Date(newDate + 'T' + newTime);
           
-          // Ellenőrizzük, hogy érvényes dátum-e
           if (isNaN(newDateTime.getTime())) {
             throw new Error('Érvénytelen dátum vagy idő formátum');
           }
@@ -458,16 +410,10 @@ function editAppointment(appointmentId) {
           })
           .then(() => {
             console.log('Időpont sikeresen frissítve');
-            
-            // Értesítés frissítése
-            if (auth.currentUser) {
-              const userId = auth.currentUser.uid;
-              sendNotification(userId, newTitle, newDateTime.toISOString(), 30)
-                .catch(error => {
-                  console.error('Hiba az értesítés frissítésekor:', error);
-                });
-            }
-            
+            showLocalNotification(
+              'Időpont módosítva',
+              `${newTitle} - ${newDateTime.toLocaleString('hu-HU')}`
+            );
             loadAppointments();
           })
           .catch(error => {
@@ -535,7 +481,6 @@ function loadSettings() {
     </form>
   `;
   
-  // Események kezelése
   document.getElementById('settings-form').addEventListener('submit', saveSettings);
   
   // Jelenlegi beállítások betöltése
@@ -639,8 +584,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Messaging inicializálása
-  initializeMessaging();
+  // Értesítések inicializálása
+  initializeNotifications();
 
   // Téma betöltése és alkalmazása
   const savedTheme = localStorage.getItem('theme') || 'light';
