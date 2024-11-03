@@ -13,28 +13,27 @@
     <script src="https://www.gstatic.com/firebasejs/9.x.x/firebase-messaging-compat.js"></script>
 </head>
 <body>
-    <header>
-        <div class="header-top">
-            <div id="user-info"></div>
-            <h1>NoteApp PWA</h1>
-        </div>
+    <div>
+        :::: header-top
+        ::: {#user-info}
+        :::
 
-        <nav>
-            <a href="#" id="dashboard-menu"><img src="/icons/dashboard.png" alt="Dashboard" class="nav-icon">Dashboard</a>
-            <a href="#" id="notes-menu"><img src="/icons/note.png" alt="Jegyzetek" class="nav-icon">Jegyzetek</a>
-            <a href="#" id="appointments-menu"><img src="/icons/calendar.png" alt="Időpontok" class="nav-icon">Időpontok</a>
-            <a href="#" id="settings-menu"><img src="/icons/settings.png" alt="Beállítások" class="nav-icon">Beállítások</a>
-            <a href="#" id="profile-menu"><img src="/icons/profile.png" alt="Profil" class="nav-icon">Profil</a>
-            <a href="#" id="admin-menu"><img src="/icons/admin.png" alt="Admin" class="nav-icon">Admin</a>
-            <a href="#" id="logout-menu"><img src="/icons/logout.png" alt="Kijelentkezés" class="nav-icon">Kijelentkezés</a>
-        </nav>
-    </header>
+        # NoteApp PWA
+        ::::
 
-    <div id="content" role="main"></div>
+        [![Dashboard](icons/dashboard.png){.nav-icon}](#){#dashboard-menu}
+        [![Jegyzetek](icons/note.png){.nav-icon}](#){#notes-menu}
+        [![Időpontok](icons/calendar.png){.nav-icon}](#){#appointments-menu}
+        [![Beállítások](icons/settings.png){.nav-icon}](#){#settings-menu}
+        [![Profil](icons/profile.png){.nav-icon}](#){#profile-menu}
+        [![Admin](icons/admin.png){.nav-icon}](#){#admin-menu}
+        [![Kijelentkezés](icons/logout.png){.nav-icon}](#){#logout-menu}
+    </div>
 
-    <footer>
-        © 2024 NoteApp PWA v1.5 - Nagy Gábor
-    </footer>
+    ::: {#content role="main"}
+    :::
+
+    © 2024 NoteApp PWA v1.5 - Nagy Gábor
 
     <!-- Alkalmazás JavaScript -->
     <script src="/js/app.js"></script>
