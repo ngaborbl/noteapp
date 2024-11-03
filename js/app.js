@@ -82,6 +82,11 @@ async function checkUpcomingAppointments() {
           notificationText
         );
       }
+    });
+  } catch (error) {
+    console.error('Hiba az időpontok ellenőrzésekor:', error);
+  }
+}
 
 // Helyi értesítés megjelenítése
 function showLocalNotification(title, body) {
