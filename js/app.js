@@ -64,29 +64,33 @@ async function sendNotification(userId, appointmentTitle, appointmentTime, notif
   try {
     // Értesítések küldése a beállított számban
     for(let i = 0; i < notificationCount; i++) {
-      const response = await fetch('https://noteapp-pwa.vercel.app/api/sendNotification', {
+      const response = await fetch('https://noteapp-seven-silk.vercel.app/api/sendNotification', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type'
         },
         body: JSON.stringify({
           userId,
           appointmentTitle,
           appointmentTime,
-          // Különböző időpontokban küldjük az értesítéseket
           notifyBefore: notificationTime * (i + 1)
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Hiba történt az értesítés küldése közben');
+        throw new Error(`Hiba történt az értesítés küldése közben: ${response.status}`);
       }
 
       const data = await response.json();
       console.log(`${i + 1}. értesítés sikeresen beállítva:`, data);
     }
   } catch (error) {
-    console.error('Hiba:', error);
+    console.error('Értesítési hiba részletei:', error);
+    // Ne állítsuk meg a folyamatot hiba esetén
+    console.log('Az időpont mentésre került, de az értesítés beállítása nem sikerült');
   }
 }
 
