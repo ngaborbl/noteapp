@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NoteApp PWA</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="css/style.css">
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.x.x/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.x.x/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.x.x/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.x.x/firebase-messaging-compat.js"></script>
+</head>
+<body>
+    <header>
+        <div class="header-top">
+            <div id="user-info"></div>
+            <h1>NoteApp PWA</h1>
+        </div>
+
+        <nav>
+            <a href="#" id="dashboard-menu"><img src="icons/dashboard.png" alt="Dashboard" class="nav-icon">Dashboard</a>
+            <a href="#" id="notes-menu"><img src="icons/note.png" alt="Jegyzetek" class="nav-icon">Jegyzetek</a>
+            <a href="#" id="appointments-menu"><img src="icons/calendar.png" alt="Időpontok" class="nav-icon">Időpontok</a>
+            <a href="#" id="settings-menu"><img src="icons/settings.png" alt="Beállítások" class="nav-icon">Beállítások</a>
+            <a href="#" id="profile-menu"><img src="icons/profile.png" alt="Profil" class="nav-icon">Profil</a>
+            <a href="#" id="admin-menu"><img src="icons/admin.png" alt="Admin" class="nav-icon">Admin</a>
+            <a href="#" id="logout-menu"><img src="icons/logout.png" alt="Kijelentkezés" class="nav-icon">Kijelentkezés</a>
+        </nav>
+    </header>
+
+    <div id="content" role="main"></div>
+
+    <footer>
+        © 2024 NoteApp PWA v1.5 - Nagy Gábor
+    </footer>
+
+    <!-- Alkalmazás JavaScript -->
+    <script src="/js/app.js"></script>
+    
+    <!-- Service Worker regisztráció -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/service-worker.js')
+                    .then(registration => {
+                        console.log('ServiceWorker regisztrálva:', registration);
+                    })
+                    .catch(error => {
+                        console.error('ServiceWorker hiba:', error);
+                    });
+            });
+        }
+    </script>
+</body>
+</html>
