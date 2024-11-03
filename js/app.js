@@ -65,17 +65,23 @@ async function checkUpcomingAppointments() {
         shouldNotify: timeDiff <= notificationTime && timeDiff > 0
       });
 
-      if (timeDiff <= notificationTime && timeDiff > 0) {
+      if (timeDiff <= notificationTime && timeDiff > -5) {
+        const minutesText = Math.round(timeDiff);
+        let notificationText;
+      
+        if (minutesText <= 0) {
+          notificationText = `${appointment.title} időpont most esedékes!`;
+        } else if (minutesText === 1) {
+          notificationText = `${appointment.title} időpont 1 perc múlva esedékes!`;
+        } else {
+          notificationText = `${appointment.title} időpont ${minutesText} perc múlva esedékes!`;
+        }
+
         showLocalNotification(
           'Közelgő időpont',
-          `${appointment.title} - ${appointmentDate.toLocaleString('hu-HU')}`
+          notificationText
         );
       }
-    });
-  } catch (error) {
-    console.error('Hiba az időpontok ellenőrzésekor:', error);
-  }
-}
 
 // Helyi értesítés megjelenítése
 function showLocalNotification(title, body) {
