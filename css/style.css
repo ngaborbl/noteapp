@@ -1,7 +1,7 @@
 /* Új betűtípus deklarálása */
 @font-face {
     font-family: 'BalooPaaji2';
-    src: url('BalooPaaji2-Regular.ttf') format('truetype');
+    src: url('../fonts/BalooPaaji2-Regular.ttf') format('truetype');
     font-weight: normal;
     font-style: normal;
 }

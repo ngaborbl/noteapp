@@ -16,58 +16,43 @@ const auth = firebase.auth();
 
 // A Firebase Messaging inicializálása és token kezelés
 function initializeMessaging() {
-  const messaging = firebase.messaging();
-  
-  // VAPID kulcs beállítása
-  messaging.usePublicVapidKey("BMClsjpGPsNjgxNlIC6vyY6q5bh2wv9xDCWeAD0bc8JX2l13zAwOXxxJzeQpchTz9YYwEKwH5xQ9LqZO8Vv0rZg");
-
-  // Először ellenőrizzük, hogy támogatja-e a böngésző a push notificationt
-  if ('Notification' in window) {
-    // Engedély kérése és token kezelése
-    Notification.requestPermission()
-      .then((permission) => {
-        if (permission === 'granted') {
-          console.log('Értesítési engedély megadva');
-          
-          // Token lekérése
-          return messaging.getToken();
-        } else {
-          throw new Error('Értesítési engedély megtagadva');
-        }
-      })
-      .then((token) => {
-        if (token) {
-          console.log('FCM Token:', token);
-          
-          // Token mentése a felhasználóhoz az adatbázisban
-          if (auth.currentUser) {
-            return db.collection('users').doc(auth.currentUser.uid).update({
-              fcmToken: token
+  try {
+    const messaging = firebase.messaging();
+    
+    // Először ellenőrizzük, hogy támogatja-e a böngésző a push notificationt
+    if ('Notification' in window) {
+      // Engedély kérése és token kezelése
+      Notification.requestPermission()
+        .then((permission) => {
+          if (permission === 'granted') {
+            console.log('Értesítési engedély megadva');
+            
+            // Token lekérése - új API használata
+            return messaging.getToken({
+              vapidKey: "BMClsjpGPsNjgxNlIC6vyY6q5bh2wv9xDCWeAD0bc8JX2l13zAwOXxxJzeQpchTz9YYwEKwH5xQ9LqZO8Vv0rZg"
             });
+          } else {
+            throw new Error('Értesítési engedély megtagadva');
           }
-        }
-      })
-      .catch((error) => {
-        console.error('Hiba a messaging inicializálásakor:', error);
-      });
-
-    // Token frissítés figyelése
-    messaging.onTokenRefresh(() => {
-      messaging.getToken()
-        .then((refreshedToken) => {
-          console.log('Token frissítve:', refreshedToken);
-          
-          // Frissített token mentése
-          if (auth.currentUser) {
-            return db.collection('users').doc(auth.currentUser.uid).update({
-              fcmToken: refreshedToken
-            });
+        })
+        .then((token) => {
+          if (token) {
+            console.log('FCM Token:', token);
+            
+            // Token mentése a felhasználóhoz az adatbázisban
+            if (auth.currentUser) {
+              return db.collection('users').doc(auth.currentUser.uid).update({
+                fcmToken: token
+              });
+            }
           }
         })
         .catch((error) => {
-          console.error('Nem sikerült frissíteni a tokent:', error);
+          console.error('Hiba a messaging inicializálásakor:', error);
         });
-    });
+    }
+  } catch (error) {
+    console.error('Firebase Messaging inicializálási hiba:', error);
   }
 }
 
@@ -541,6 +526,11 @@ function applyTheme(theme) {
 // Bejelentkező űrlap megjelenítése
 function showLoginForm() {
   const contentElement = document.getElementById('content');
+  if (!contentElement) {
+    console.error('Content element not found');
+    return;
+  }
+  
   contentElement.innerHTML = `
     <h2>Bejelentkezés</h2>
     <form id="login-form">
