@@ -53,7 +53,7 @@ function setupLocalNotifications() {
   // Értesítések ellenőrzése gyakrabban
   setInterval(() => {
     checkUpcomingAppointments();
-  }, 30000); // 30 másodpercenként ellenőriz
+  }, 15000); // 15 másodpercenként ellenőriz
 }
 
 // Közelgő időpontok ellenőrzése
@@ -120,9 +120,6 @@ function showLocalNotification(title, body) {
 
   if (Notification.permission === 'granted') {
     try {
-      // Hangjelzés hozzáadása
-      const audio = new Audio('/notification.mp3'); // Ha van hang fájlunk
-      
       const notification = new Notification(title, {
         body: body,
         requireInteraction: true,
@@ -130,12 +127,8 @@ function showLocalNotification(title, body) {
         renotify: true,
         silent: false,
         vibrate: [200, 100, 200], // Rezgés minta
-        // Ikon hozzáadása
-        icon: '/icons/calendar.png', // Használjuk a meglévő calendar ikont
+        icon: '/icons/calendar.png'
       });
-
-      // Hangjelzés lejátszása
-      audio.play().catch(e => console.log('Hang lejátszása nem sikerült:', e));
 
       notification.onclick = function() {
         console.log('Értesítésre kattintás');
@@ -155,12 +148,7 @@ function showLocalNotification(title, body) {
       return notification;
     } catch (error) {
       console.error('Részletes értesítési hiba:', error);
-      // Próbáljunk meg egy egyszerűbb értesítést
-      try {
-        alert(`${title}\n${body}`);
-      } catch (e) {
-        console.error('Még az alert sem működik:', e);
-      }
+      alert(`${title}\n${body}`);
     }
   } else if (Notification.permission === 'denied') {
     console.log('Értesítések letiltva a felhasználó által');
@@ -170,7 +158,7 @@ function showLocalNotification(title, body) {
     Notification.requestPermission()
       .then(permission => {
         if (permission === 'granted') {
-          showLocalNotification(title, body); // Újrapróbálkozás
+          showLocalNotification(title, body);
         }
       });
   }

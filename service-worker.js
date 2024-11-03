@@ -1,17 +1,18 @@
+// service-worker.js
 const CACHE_NAME = 'noteapp-cache-v1';
 const urlsToCache = [
   '/',
   '/index.html',
-  '/css/style.css',
   '/js/app.js',
-  '/images/icon-192x192.png',
-  '/images/icon-512x512.png'
+  '/css/style.css',
+  '/icons/calendar.png'
 ];
 
 self.addEventListener('install', function(event) {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(function(cache) {
+        console.log('Opened cache');
         return cache.addAll(urlsToCache);
       })
   );
