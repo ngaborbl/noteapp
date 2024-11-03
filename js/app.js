@@ -16,15 +16,35 @@ const auth = firebase.auth();
 
 // Egyszerű értesítési rendszer
 function initializeNotifications() {
-  if ('Notification' in window) {
-    Notification.requestPermission()
-      .then(permission => {
-        if (permission === 'granted') {
-          console.log('Értesítési engedély megadva');
-          setupLocalNotifications();
-        }
-      });
+  console.log('Értesítések inicializálása...');
+  
+  if (!('Notification' in window)) {
+    console.log('A böngésző nem támogatja az értesítéseket');
+    return;
   }
+
+  Notification.requestPermission()
+    .then(permission => {
+      console.log('Értesítési engedély állapota:', permission);
+      if (permission === 'granted') {
+        console.log('Értesítési engedély megadva');
+        setupLocalNotifications();
+        
+        // Teszteljük az értesítéseket
+        setTimeout(() => {
+          showLocalNotification(
+            'Teszt értesítés',
+            'Ez egy teszt értesítés az inicializálás után'
+          );
+        }, 3000);
+      } else {
+        console.log('Értesítési engedély megtagadva');
+        alert('Az alkalmazás értesítések nélkül is működik, de nem fog értesítéseket küldeni az időpontokról.');
+      }
+    })
+    .catch(error => {
+      console.error('Hiba az értesítési engedély kérésekor:', error);
+    });
 }
 
 // Helyi értesítések kezelése
@@ -62,23 +82,24 @@ async function checkUpcomingAppointments() {
         title: appointment.title,
         date: appointmentDate.toLocaleString(),
         timeDiff: Math.round(timeDiff),
-        shouldNotify: timeDiff <= notificationTime && timeDiff > 0
+        shouldNotify: timeDiff <= notificationTime && timeDiff > -5
       });
 
+      // Próbáljunk gyakrabban értesíteni
       if (timeDiff <= notificationTime && timeDiff > -5) {
         const minutesText = Math.round(timeDiff);
         let notificationText;
-      
+        
         if (minutesText <= 0) {
-          notificationText = `${appointment.title} időpont most esedékes!`;
+          notificationText = `${appointment.title} időpont most van!`;
         } else if (minutesText === 1) {
-          notificationText = `${appointment.title} időpont 1 perc múlva esedékes!`;
+          notificationText = `FIGYELEM: ${appointment.title} időpont 1 perc múlva!`;
         } else {
-          notificationText = `${appointment.title} időpont ${minutesText} perc múlva esedékes!`;
+          notificationText = `FIGYELEM: ${appointment.title} időpont ${minutesText} perc múlva!`;
         }
 
         showLocalNotification(
-          'Közelgő időpont',
+          '❗ Közelgő időpont ❗',
           notificationText
         );
       }
@@ -90,16 +111,31 @@ async function checkUpcomingAppointments() {
 
 // Helyi értesítés megjelenítése
 function showLocalNotification(title, body) {
+  console.log('Értesítés indítása:', { title, body });
+  
+  if (!('Notification' in window)) {
+    console.log('A böngésző nem támogatja az értesítéseket');
+    return;
+  }
+
   if (Notification.permission === 'granted') {
-    console.log('Értesítés küldése:', { title, body });
-    
     try {
+      // Hangjelzés hozzáadása
+      const audio = new Audio('/notification.mp3'); // Ha van hang fájlunk
+      
       const notification = new Notification(title, {
         body: body,
         requireInteraction: true,
-        tag: 'appointment-notification', // Egyedi azonosító
-        renotify: true // Újraértesítés engedélyezése
+        tag: 'appointment-notification',
+        renotify: true,
+        silent: false,
+        vibrate: [200, 100, 200], // Rezgés minta
+        // Ikon hozzáadása
+        icon: '/icons/calendar.png', // Használjuk a meglévő calendar ikont
       });
+
+      // Hangjelzés lejátszása
+      audio.play().catch(e => console.log('Hang lejátszása nem sikerült:', e));
 
       notification.onclick = function() {
         console.log('Értesítésre kattintás');
@@ -107,12 +143,36 @@ function showLocalNotification(title, body) {
         this.close();
       };
 
+      notification.onshow = function() {
+        console.log('Értesítés megjelenítve');
+      };
+
+      notification.onerror = function(e) {
+        console.error('Értesítés hiba:', e);
+      };
+
       console.log('Értesítés sikeresen létrehozva');
+      return notification;
     } catch (error) {
-      console.error('Hiba az értesítés létrehozásakor:', error);
+      console.error('Részletes értesítési hiba:', error);
+      // Próbáljunk meg egy egyszerűbb értesítést
+      try {
+        alert(`${title}\n${body}`);
+      } catch (e) {
+        console.error('Még az alert sem működik:', e);
+      }
     }
+  } else if (Notification.permission === 'denied') {
+    console.log('Értesítések letiltva a felhasználó által');
+    alert('Az értesítések le vannak tiltva. Kérjük, engedélyezze őket a böngésző beállításaiban.');
   } else {
-    console.log('Értesítések nincsenek engedélyezve');
+    console.log('Értesítési engedély kérése...');
+    Notification.requestPermission()
+      .then(permission => {
+        if (permission === 'granted') {
+          showLocalNotification(title, body); // Újrapróbálkozás
+        }
+      });
   }
 }
 
