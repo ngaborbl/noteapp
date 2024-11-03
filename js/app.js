@@ -48,65 +48,124 @@ function initializeNotifications() {
 }
 
 // Helyi értesítések kezelése
-function setupLocalNotifications() {
-  console.log('Értesítések figyelése elindítva');
-  // Értesítések ellenőrzése gyakrabban
-  setInterval(() => {
-    checkUpcomingAppointments();
-  }, 15000); // 15 másodpercenként ellenőriz
+function showLocalNotification(title, body, id) {  // id paraméter hozzáadva
+  console.log('Értesítés indítása:', { title, body, id });
+  
+  if (!('Notification' in window)) {
+    console.log('A böngésző nem támogatja az értesítéseket');
+    return;
+  }
+
+  // Ellenőrizzük, hogy volt-e már értesítés erről az időpontról az elmúlt percben
+  const lastNotification = localStorage.getItem(`lastNotification_${id}`);
+  const now = Date.now();
+  if (lastNotification && now - parseInt(lastNotification) < 60000) { // 1 perc várakozás
+    console.log('Túl gyakori értesítés, kihagyjuk:', id);
+    return;
+  }
+
+  if (Notification.permission === 'granted') {
+    try {
+      const notification = new Notification(title, {
+        body: body,
+        requireInteraction: true,
+        tag: `appointment-${id}`,  // Egyedi tag minden időponthoz
+        renotify: true,
+        silent: false,
+        vibrate: [200, 100, 200],
+        icon: '/icons/calendar.png',
+        badge: '/icons/calendar.png'
+      });
+
+      // Mentjük az értesítés időpontját
+      localStorage.setItem(`lastNotification_${id}`, now.toString());
+
+      notification.onclick = function() {
+        console.log('Értesítésre kattintás:', id);
+        window.focus();
+        this.close();
+      };
+
+      notification.onshow = function() {
+        console.log('Értesítés megjelenítve:', id);
+      };
+
+      console.log('Értesítés sikeresen létrehozva:', id);
+      return notification;
+    } catch (error) {
+      console.error('Értesítési hiba:', error);
+    }
+  }
 }
 
-// Közelgő időpontok ellenőrzése
+// Módosítsuk az értesítések ellenőrzését
 async function checkUpcomingAppointments() {
   const now = new Date();
   const notificationTime = parseInt(localStorage.getItem('notificationTime') || '30');
-  
-  console.log('Időpontok ellenőrzése:', {
-    currentTime: now.toLocaleString(),
-    notificationTime: notificationTime
-  });
 
   try {
     const snapshot = await db.collection('appointments')
       .where('date', '>', now)
       .get();
 
-    console.log('Talált időpontok száma:', snapshot.size);
-
     snapshot.forEach(doc => {
       const appointment = doc.data();
       const appointmentDate = appointment.date.toDate();
-      const timeDiff = (appointmentDate - now) / (1000 * 60); // percben
+      const timeDiff = (appointmentDate - now) / (1000 * 60);
 
-      console.log('Időpont ellenőrzése:', {
-        title: appointment.title,
-        date: appointmentDate.toLocaleString(),
-        timeDiff: Math.round(timeDiff),
-        shouldNotify: timeDiff <= notificationTime && timeDiff > -5
-      });
+      // Csak bizonyos időpontokban értesítünk
+      const notifyAt = [15, 10, 5, 3, 1]; // percek
+      const shouldNotify = notifyAt.includes(Math.round(timeDiff));
 
-      // Próbáljunk gyakrabban értesíteni
-      if (timeDiff <= notificationTime && timeDiff > -5) {
+      if (shouldNotify) {
         const minutesText = Math.round(timeDiff);
-        let notificationText;
-        
-        if (minutesText <= 0) {
-          notificationText = `${appointment.title} időpont most van!`;
-        } else if (minutesText === 1) {
-          notificationText = `FIGYELEM: ${appointment.title} időpont 1 perc múlva!`;
-        } else {
-          notificationText = `FIGYELEM: ${appointment.title} időpont ${minutesText} perc múlva!`;
-        }
+        const notificationText = `${appointment.title} időpont ${minutesText} perc múlva lesz!`;
 
         showLocalNotification(
-          '❗ Közelgő időpont ❗',
-          notificationText
+          '🔔 Közelgő időpont',
+          notificationText,
+          doc.id  // Az időpont egyedi azonosítója
         );
       }
     });
   } catch (error) {
     console.error('Hiba az időpontok ellenőrzésekor:', error);
   }
+}
+
+// Módosítsuk az értesítések időzítését
+function setupLocalNotifications() {
+  console.log('Értesítések figyelése elindítva');
+  checkUpcomingAppointments(); // Azonnali első ellenőrzés
+  setInterval(checkUpcomingAppointments, 30000); // 30 másodpercenként
+}
+
+// A teszt értesítést is módosítsuk
+function initializeNotifications() {
+  console.log('Értesítések inicializálása...');
+  
+  if (!('Notification' in window)) {
+    console.log('A böngésző nem támogatja az értesítéseket');
+    return;
+  }
+
+  Notification.requestPermission()
+    .then(permission => {
+      console.log('Értesítési engedély állapota:', permission);
+      if (permission === 'granted') {
+        console.log('Értesítési engedély megadva');
+        setupLocalNotifications();
+        
+        // Teszteljük az értesítéseket
+        setTimeout(() => {
+          showLocalNotification(
+            '🔔 Teszt értesítés',
+            'Az értesítési rendszer működik',
+            'test'
+          );
+        }, 3000);
+      }
+    });
 }
 
 // Helyi értesítés megjelenítése
