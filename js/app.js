@@ -14,6 +14,81 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 const auth = firebase.auth();
 
+// Böngésző detektálás
+function detectBrowser() {
+  if ((navigator.userAgent.indexOf("Opera") || navigator.userAgent.indexOf('OPR')) !== -1) {
+    return 'opera';
+  } else if (navigator.userAgent.indexOf("Chrome") !== -1) {
+    return 'chrome';
+  } else if (navigator.userAgent.indexOf("Safari") !== -1) {
+    return 'safari';
+  } else if (navigator.userAgent.indexOf("Firefox") !== -1) {
+    return 'firefox';
+  } else {
+    return 'unknown';
+  }
+}
+
+// Alternatív értesítés Opera böngészőhöz
+function showBrowserNotification(title, body) {
+  // Létrehozunk egy fix pozíciójú div-et az értesítéshez
+  const notificationDiv = document.createElement('div');
+  notificationDiv.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: #333;
+    color: white;
+    padding: 15px;
+    border-radius: 5px;
+    z-index: 9999;
+    max-width: 300px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    animation: slideIn 0.5s ease-out;
+  `;
+
+  notificationDiv.innerHTML = `
+    <div style="font-weight: bold; margin-bottom: 5px;">${title}</div>
+    <div>${body}</div>
+    <button style="
+      margin-top: 10px;
+      padding: 5px 10px;
+      border: none;
+      background: #4CAF50;
+      color: white;
+      border-radius: 3px;
+      cursor: pointer;
+    ">Bezárás</button>
+  `;
+
+  // CSS animáció hozzáadása
+  const style = document.createElement('style');
+  style.textContent = `
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+  `;
+  document.head.appendChild(style);
+
+  // Bezárás gomb kezelése
+  const closeButton = notificationDiv.querySelector('button');
+  closeButton.onclick = () => {
+    notificationDiv.style.animation = 'slideOut 0.5s ease-in';
+    setTimeout(() => notificationDiv.remove(), 500);
+  };
+
+  // Automatikus eltűnés 10 másodperc után
+  setTimeout(() => {
+    if (document.body.contains(notificationDiv)) {
+      notificationDiv.style.animation = 'slideOut 0.5s ease-in';
+      setTimeout(() => notificationDiv.remove(), 500);
+    }
+  }, 10000);
+
+  document.body.appendChild(notificationDiv);
+}
+
 // Egyszerű értesítési rendszer
 function initializeNotifications() {
   console.log('Értesítések inicializálása...');
@@ -140,40 +215,21 @@ function setupLocalNotifications() {
   setInterval(checkUpcomingAppointments, 30000); // 30 másodpercenként
 }
 
-// A teszt értesítést is módosítsuk
-function initializeNotifications() {
-  console.log('Értesítések inicializálása...');
-  
-  if (!('Notification' in window)) {
-    console.log('A böngésző nem támogatja az értesítéseket');
-    return;
-  }
-
-  Notification.requestPermission()
-    .then(permission => {
-      console.log('Értesítési engedély állapota:', permission);
-      if (permission === 'granted') {
-        console.log('Értesítési engedély megadva');
-        setupLocalNotifications();
-        
-        // Teszteljük az értesítéseket
-        setTimeout(() => {
-          showLocalNotification(
-            '🔔 Teszt értesítés',
-            'Az értesítési rendszer működik',
-            'test'
-          );
-        }, 3000);
-      }
-    });
-}
-
 // Helyi értesítés megjelenítése
 function showLocalNotification(title, body) {
   console.log('Értesítés indítása:', { title, body });
   
   if (!('Notification' in window)) {
     console.log('A böngésző nem támogatja az értesítéseket');
+    return;
+  }
+  
+   // Böngésző detektálás és kezelés
+  const browserType = detectBrowser();
+  if (browserType === 'opera') {
+    console.log('Opera böngésző észlelve, alternatív értesítési mód használata');
+    // Opera esetén használjunk alert-et vagy egy egyedi értesítési div-et
+    showBrowserNotification(title, body);
     return;
   }
 
