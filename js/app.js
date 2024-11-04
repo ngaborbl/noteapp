@@ -104,22 +104,43 @@ function initializeNotifications() {
       if (permission === 'granted') {
         console.log('Értesítési engedély megadva');
         setupLocalNotifications();
+        
+        // Teszteljük az értesítéseket
+        setTimeout(() => {
+          showLocalNotification(
+            '🔔 Teszt értesítés',
+            'Az értesítési rendszer működik',
+            'test'
+          );
+        }, 3000);
+      }
+    })
+    .catch(error => {
+      console.error('Hiba az értesítési engedély kérésekor:', error);
     });
 }
 
 // Helyi értesítések kezelése
-function showLocalNotification(title, body, id) {  // id paraméter hozzáadva
-  console.log('Értesítés indítása:', { title, body, id });
+function showLocalNotification(title, body, id) {
+  console.log('Értesítés indítása:', { title, body, id, browser: detectBrowser() });
   
   if (!('Notification' in window)) {
     console.log('A böngésző nem támogatja az értesítéseket');
     return;
   }
 
+  // Böngésző-specifikus kezelés
+  const browserType = detectBrowser();
+  if (browserType === 'opera') {
+    console.log('Opera böngésző észlelve, alternatív értesítési mód használata');
+    showBrowserNotification(title, body);
+    return;
+  }
+
   // Ellenőrizzük, hogy volt-e már értesítés erről az időpontról az elmúlt percben
   const lastNotification = localStorage.getItem(`lastNotification_${id}`);
   const now = Date.now();
-  if (lastNotification && now - parseInt(lastNotification) < 60000) { // 1 perc várakozás
+  if (lastNotification && now - parseInt(lastNotification) < 60000) {
     console.log('Túl gyakori értesítés, kihagyjuk:', id);
     return;
   }
@@ -129,7 +150,7 @@ function showLocalNotification(title, body, id) {  // id paraméter hozzáadva
       const notification = new Notification(title, {
         body: body,
         requireInteraction: true,
-        tag: `appointment-${id}`,  // Egyedi tag minden időponthoz
+        tag: `appointment-${id}`,
         renotify: true,
         silent: false,
         vibrate: [200, 100, 200],
@@ -154,6 +175,7 @@ function showLocalNotification(title, body, id) {  // id paraméter hozzáadva
       return notification;
     } catch (error) {
       console.error('Értesítési hiba:', error);
+      showBrowserNotification(title, body);  // Fallback az egyedi értesítésre
     }
   }
 }
@@ -470,7 +492,8 @@ function addAppointment(e) {
         // Azonnali értesítés az időpont létrehozásáról
         showLocalNotification(
           'Új időpont létrehozva',
-          `${title} időpont létrehozva: ${dateTime.toLocaleString('hu-HU')}`
+          `${title} időpont létrehozva: ${dateTime.toLocaleString('hu-HU')}`,
+          docRef.id  // Az új időpont ID-ja
         );
         
         // Form tisztítása
@@ -534,7 +557,8 @@ function editAppointment(appointmentId) {
             console.log('Időpont sikeresen frissítve');
             showLocalNotification(
               'Időpont módosítva',
-              `${newTitle} - ${newDateTime.toLocaleString('hu-HU')}`
+              `${newTitle} - ${newDateTime.toLocaleString('hu-HU')}`,
+              appointmentId  // A módosított időpont ID-ja
             );
             loadAppointments();
           })
