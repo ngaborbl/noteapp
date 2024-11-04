@@ -225,19 +225,20 @@ function setupLocalNotifications() {
 // Alkalmazás inicializálása
 function initApp() {
   console.log("Alkalmazás inicializálása...");
-  // Menüsor alapból elrejtve
-  document.querySelector('nav').style.display = 'none';
+  // A menüsor alapértelmezetten rejtett
+  const navElement = document.querySelector('nav');
+  navElement.style.display = 'none';
   
   auth.onAuthStateChanged((user) => {
     if (user) {
       console.log("Felhasználó bejelentkezve:", user.email);
       // Menüsor megjelenítése bejelentkezéskor
-      document.querySelector('nav').style.display = 'flex';
+      navElement.style.display = 'flex';
       showModule('dashboard');
     } else {
       console.log("Nincs bejelentkezett felhasználó");
       // Menüsor elrejtése kijelentkezéskor
-      document.querySelector('nav').style.display = 'none';
+      navElement.style.display = 'none';
       showLoginForm();
     }
   });
@@ -758,6 +759,8 @@ function login(e) {
 function logout() {
   auth.signOut().then(() => {
     console.log('Kijelentkezés sikeres');
+    // Menüsor elrejtése
+    document.querySelector('nav').style.display = 'none';
     showLoginForm();
   }).catch((error) => {
     console.error('Hiba a kijelentkezésnél:', error);
