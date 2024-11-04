@@ -225,12 +225,19 @@ function setupLocalNotifications() {
 // Alkalmazás inicializálása
 function initApp() {
   console.log("Alkalmazás inicializálása...");
+  // Menüsor alapból elrejtve
+  document.querySelector('nav').style.display = 'none';
+  
   auth.onAuthStateChanged((user) => {
     if (user) {
       console.log("Felhasználó bejelentkezve:", user.email);
+      // Menüsor megjelenítése bejelentkezéskor
+      document.querySelector('nav').style.display = 'flex';
       showModule('dashboard');
     } else {
       console.log("Nincs bejelentkezett felhasználó");
+      // Menüsor elrejtése kijelentkezéskor
+      document.querySelector('nav').style.display = 'none';
       showLoginForm();
     }
   });
@@ -336,10 +343,14 @@ function loadNotes() {
       snapshot.forEach(doc => {
         const note = doc.data();
         const li = document.createElement('li');
+        li.setAttribute('data-note-id', doc.id); // Azonosító hozzáadása
+        li.id = doc.id; // ID hozzáadása a könnyebb lekéréshez
         li.innerHTML = `
-          ${note.content}
-          <button onclick="editNote('${doc.id}')">Szerkesztés</button>
-          <button onclick="deleteNote('${doc.id}')">Törlés</button>
+          <span class="note-content">${note.content}</span>
+          <div class="note-actions">
+            <button onclick="editNote('${doc.id}')">Szerkesztés</button>
+            <button onclick="deleteNote('${doc.id}')">Törlés</button>
+          </div>
         `;
         notesList.appendChild(li);
       });
@@ -371,19 +382,65 @@ function addNote(e) {
 
 // Jegyzet szerkesztése
 function editNote(noteId) {
-  const newContent = prompt('Új tartalom:');
-  if (newContent) {
-    db.collection('notes').doc(noteId).update({
-      content: newContent,
-      timestamp: firebase.firestore.FieldValue.serverTimestamp()
-    })
-    .then(() => {
-      loadNotes();
+  // Először lekérjük a jegyzet jelenlegi tartalmát
+  db.collection('notes').doc(noteId).get()
+    .then(doc => {
+      if (doc.exists) {
+        const note = doc.data();
+        // Létrehozunk egy szerkesztő űrlapot az aktuális tartalommal
+        const li = document.getElementById(noteId) || document.querySelector(`[data-note-id="${noteId}"]`);
+        const originalContent = note.content;
+        
+        // Űrlap létrehozása
+        li.innerHTML = `
+          <form class="edit-note-form">
+            <input type="text" class="edit-note-input" value="${originalContent}" required>
+            <button type="submit" class="save-note">Mentés</button>
+            <button type="button" class="cancel-edit">Mégse</button>
+          </form>
+        `;
+
+        // Űrlap események kezelése
+        const form = li.querySelector('.edit-note-form');
+        const input = li.querySelector('.edit-note-input');
+        const cancelButton = li.querySelector('.cancel-edit');
+
+        // Mentés gomb eseménykezelő
+        form.addEventListener('submit', (e) => {
+          e.preventDefault();
+          const newContent = input.value.trim();
+          
+          if (newContent && newContent !== originalContent) {
+            db.collection('notes').doc(noteId).update({
+              content: newContent,
+              timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            })
+            .then(() => {
+              loadNotes(); // Lista újratöltése
+            })
+            .catch(error => {
+              console.error('Hiba a jegyzet szerkesztésekor:', error);
+              alert('Hiba történt a jegyzet mentésekor.');
+            });
+          } else {
+            loadNotes(); // Ha nem változott, csak újratöltjük
+          }
+        });
+
+        // Mégse gomb eseménykezelő
+        cancelButton.addEventListener('click', () => {
+          loadNotes(); // Visszatöltjük az eredeti listát
+        });
+
+        // Input mezőre fókuszálás és a kurzor a szöveg végére
+        input.focus();
+        input.setSelectionRange(input.value.length, input.value.length);
+      }
     })
     .catch(error => {
-      console.error('Hiba a jegyzet szerkesztésekor:', error);
+      console.error('Hiba a jegyzet betöltésekor:', error);
+      alert('Hiba történt a jegyzet betöltésekor.');
     });
-  }
 }
 
 // Jegyzet törlése
