@@ -1028,4 +1028,4 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
-console.log("app.js betöltve és feldolgozva - v1.3");
+console.log("app.js betöltve és feldolgozva - v1.2 - force cache clear " + new Date().toISOString());
