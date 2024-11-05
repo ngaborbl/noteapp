@@ -1028,6 +1028,4 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
-// Egyenlőre szívás ez az app
-
-console.log("app.js betöltve és feldolgozva");
+console.log("app.js betöltve és feldolgozva - v1.3");
