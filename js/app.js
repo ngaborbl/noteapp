@@ -274,53 +274,264 @@ function loadDashboard() {
   const contentElement = document.getElementById('content');
   contentElement.innerHTML = `
     <h2>Dashboard</h2>
-    <div class="dashboard-grid">
-      <div class="dashboard-card">
-        <h3>Legutóbbi Jegyzetek</h3>
-        <ul id="recent-notes-list"></ul>
+    
+    <!-- Statisztikai kártyák -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <h4>Jegyzetek száma</h4>
+        <div id="notes-count">Betöltés...</div>
       </div>
+      <div class="stat-card">
+        <h4>Mai időpontok</h4>
+        <div id="today-appointments">Betöltés...</div>
+      </div>
+      <div class="stat-card">
+        <h4>Következő időpont</h4>
+        <div id="next-appointment">Betöltés...</div>
+      </div>
+    </div>
+
+    <!-- Keresés és szűrés -->
+    <div class="dashboard-controls">
+      <input type="text" id="dashboard-search" placeholder="Keresés jegyzetek és időpontok között...">
+      <select id="dashboard-filter">
+        <option value="all">Minden elem</option>
+        <option value="notes">Csak jegyzetek</option>
+        <option value="appointments">Csak időpontok</option>
+      </select>
+    </div>
+
+    <div class="dashboard-grid">
+      <!-- Jegyzetek szekció -->
       <div class="dashboard-card">
-        <h3>Közelgő Időpontok</h3>
+        <div class="card-header">
+          <h3>Legutóbbi Jegyzetek</h3>
+          <select id="notes-sort">
+            <option value="newest">Legújabb elől</option>
+            <option value="oldest">Legrégebbi elől</option>
+          </select>
+        </div>
+        <ul id="recent-notes-list"></ul>
+        <button onclick="showModule('notes')" class="view-all-btn">Összes jegyzet</button>
+      </div>
+
+      <!-- Időpontok szekció -->
+      <div class="dashboard-card">
+        <div class="card-header">
+          <h3>Közelgő Időpontok</h3>
+          <select id="appointments-range">
+            <option value="today">Mai nap</option>
+            <option value="week">Következő 7 nap</option>
+            <option value="month">Következő 30 nap</option>
+          </select>
+        </div>
         <ul id="upcoming-appointments-list"></ul>
+        <button onclick="showModule('appointments')" class="view-all-btn">Összes időpont</button>
       </div>
     </div>
   `;
+
+  // Statisztikák betöltése
+  loadDashboardStats();
+  
+  // Jegyzetek és időpontok betöltése
   loadRecentNotes();
   loadUpcomingAppointments();
+
+  // Események kezelése
+  setupDashboardEvents();
 }
 
-function loadRecentNotes() {
+function loadDashboardStats() {
+  // Jegyzetek számának lekérése
+  db.collection('notes').where('userId', '==', auth.currentUser.uid).get()
+    .then(snapshot => {
+      document.getElementById('notes-count').textContent = snapshot.size + ' db';
+    })
+    .catch(error => {
+      console.error('Hiba a jegyzetek számának lekérésekor:', error);
+      document.getElementById('notes-count').textContent = 'Hiba történt';
+    });
+
+  // Mai időpontok számának lekérése
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  db.collection('appointments')
+    .where('userId', '==', auth.currentUser.uid)
+    .where('date', '>=', today)
+    .where('date', '<', tomorrow)
+    .get()
+    .then(snapshot => {
+      document.getElementById('today-appointments').textContent = snapshot.size + ' db';
+    })
+    .catch(error => {
+      console.error('Hiba a mai időpontok lekérésekor:', error);
+      document.getElementById('today-appointments').textContent = 'Hiba történt';
+    });
+
+  // Következő időpont lekérése
+  db.collection('appointments')
+    .where('userId', '==', auth.currentUser.uid)
+    .where('date', '>=', new Date())
+    .orderBy('date')
+    .limit(1)
+    .get()
+    .then(snapshot => {
+      if (!snapshot.empty) {
+        const nextAppointment = snapshot.docs[0].data();
+        document.getElementById('next-appointment').textContent = 
+          `${nextAppointment.title} - ${nextAppointment.date.toDate().toLocaleString('hu-HU')}`;
+      } else {
+        document.getElementById('next-appointment').textContent = 'Nincs közelgő időpont';
+      }
+    })
+    .catch(error => {
+      console.error('Hiba a következő időpont lekérésekor:', error);
+      document.getElementById('next-appointment').textContent = 'Hiba történt';
+    });
+}
+
+function setupDashboardEvents() {
+  // Keresés kezelése
+  const searchInput = document.getElementById('dashboard-search');
+  if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+      const searchTerm = e.target.value.toLowerCase();
+      filterDashboardItems(searchTerm);
+    });
+  }
+
+  // Szűrő kezelése
+  const filterSelect = document.getElementById('dashboard-filter');
+  if (filterSelect) {
+    filterSelect.addEventListener('change', () => {
+      const searchTerm = document.getElementById('dashboard-search').value.toLowerCase();
+      filterDashboardItems(searchTerm);
+    });
+  }
+
+  // Jegyzetek rendezése
+  const notesSort = document.getElementById('notes-sort');
+  if (notesSort) {
+    notesSort.addEventListener('change', () => {
+      loadRecentNotes(notesSort.value);
+    });
+  }
+
+  // Időpontok időtartam választó
+  const appointmentsRange = document.getElementById('appointments-range');
+  if (appointmentsRange) {
+    appointmentsRange.addEventListener('change', () => {
+      loadUpcomingAppointments(appointmentsRange.value);
+    });
+  }
+}
+
+function filterDashboardItems(searchTerm) {
+  const filter = document.getElementById('dashboard-filter').value;
+  
+  if (filter === 'all' || filter === 'notes') {
+    const noteItems = document.querySelectorAll('#recent-notes-list li');
+    noteItems.forEach(item => {
+      const text = item.textContent.toLowerCase();
+      item.style.display = text.includes(searchTerm) ? '' : 'none';
+    });
+  }
+
+  if (filter === 'all' || filter === 'appointments') {
+    const appointmentItems = document.querySelectorAll('#upcoming-appointments-list li');
+    appointmentItems.forEach(item => {
+      const text = item.textContent.toLowerCase();
+      item.style.display = text.includes(searchTerm) ? '' : 'none';
+    });
+  }
+}
+
+function loadRecentNotes(sortOrder = 'newest') {
   const notesList = document.getElementById('recent-notes-list');
-  db.collection('notes').orderBy('timestamp', 'desc').limit(5).get()
+  const query = db.collection('notes')
+    .where('userId', '==', auth.currentUser.uid)
+    .orderBy('timestamp', sortOrder === 'newest' ? 'desc' : 'asc')
+    .limit(5);
+
+  query.get()
     .then(snapshot => {
       notesList.innerHTML = '';
+      if (snapshot.empty) {
+        notesList.innerHTML = '<li class="empty-message">Nincsenek jegyzetek</li>';
+        return;
+      }
+      
       snapshot.forEach(doc => {
         const note = doc.data();
         const li = document.createElement('li');
-        li.textContent = note.content;
+        li.innerHTML = `
+          <div class="note-content">
+            ${note.content}
+          </div>
+          <div class="note-date">
+            ${note.timestamp ? note.timestamp.toDate().toLocaleString('hu-HU') : 'Dátum nélkül'}
+          </div>
+        `;
         notesList.appendChild(li);
       });
     })
     .catch(error => {
       console.error('Hiba a jegyzetek betöltésekor:', error);
+      notesList.innerHTML = '<li class="error-message">Hiba történt a jegyzetek betöltésekor</li>';
     });
 }
 
-function loadUpcomingAppointments() {
+function loadUpcomingAppointments(range = 'week') {
   const appointmentsList = document.getElementById('upcoming-appointments-list');
   const now = new Date();
-  db.collection('appointments').where('date', '>', now).orderBy('date').limit(5).get()
+  let endDate = new Date();
+
+  switch(range) {
+    case 'today':
+      endDate.setHours(23, 59, 59, 999);
+      break;
+    case 'week':
+      endDate.setDate(endDate.getDate() + 7);
+      break;
+    case 'month':
+      endDate.setMonth(endDate.getMonth() + 1);
+      break;
+  }
+
+  const query = db.collection('appointments')
+    .where('userId', '==', auth.currentUser.uid)
+    .where('date', '>=', now)
+    .where('date', '<=', endDate)
+    .orderBy('date', 'asc')
+    .limit(5);
+
+  query.get()
     .then(snapshot => {
       appointmentsList.innerHTML = '';
+      if (snapshot.empty) {
+        appointmentsList.innerHTML = '<li class="empty-message">Nincsenek közelgő időpontok</li>';
+        return;
+      }
+
       snapshot.forEach(doc => {
         const appointment = doc.data();
         const li = document.createElement('li');
-        li.textContent = `${appointment.title} - ${appointment.date.toDate().toLocaleString('hu-HU')}`;
+        li.innerHTML = `
+          <div class="appointment-title">${appointment.title}</div>
+          <div class="appointment-date">
+            ${appointment.date.toDate().toLocaleString('hu-HU')}
+          </div>
+        `;
         appointmentsList.appendChild(li);
       });
     })
     .catch(error => {
       console.error('Hiba az időpontok betöltésekor:', error);
+      appointmentsList.innerHTML = '<li class="error-message">Hiba történt az időpontok betöltésekor</li>';
     });
 }
 
@@ -338,7 +549,10 @@ function loadNotes() {
   document.getElementById('new-note-form').addEventListener('submit', addNote);
   
   const notesList = document.getElementById('notes-list');
-  db.collection('notes').orderBy('timestamp', 'desc').get()
+  db.collection('notes')
+    .where('userId', '==', auth.currentUser.uid)
+    .orderBy('timestamp', 'desc')
+    .get()
     .then(snapshot => {
       notesList.innerHTML = '';
       snapshot.forEach(doc => {
@@ -369,6 +583,7 @@ function addNote(e) {
   if (newNoteContent) {
     db.collection('notes').add({
       content: newNoteContent,
+      userId: auth.currentUser.uid,
       timestamp: firebase.firestore.FieldValue.serverTimestamp()
     })
     .then(() => {
@@ -476,6 +691,7 @@ function loadAppointments() {
   const now = new Date();
   
   db.collection('appointments')
+    .where('userId', '==', auth.currentUser.uid)
     .orderBy('date', 'asc')
     .get()
     .then(snapshot => {
@@ -541,6 +757,7 @@ function addAppointment(e) {
       db.collection('appointments').add({
         title: title,
         date: timestamp,
+        userId: auth.currentUser.uid,
         status: 'pending',
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       })
