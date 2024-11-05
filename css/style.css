@@ -259,39 +259,130 @@ body.dark select {
 }
 
 /* Reszponzív beállítások kisebb képernyőkre */
-@media (max-width: 600px) {
-    .header-top {
-        flex-wrap: wrap;
-    }
+@media (max-width: 768px) {
+  /* Alap elrendezés */
+  .header-top {
+    flex-wrap: wrap;
+  }
 
-    #user-info {
-        margin-right: 0;
-        margin-bottom: 0.5rem;
-        width: 100%;
-    }
+  #user-info {
+    margin-right: 0;
+    margin-bottom: 0.5rem;
+    width: 100%;
+  }
 
-    header h1 {
-        width: 100%;
-        text-align: center;
-    }
+  header h1 {
+    width: 100%;
+    text-align: center;
+  }
 
-    nav {
-        overflow-x: auto;
-        justify-content: flex-start;
-    }
+  nav {
+    overflow-x: auto;
+    justify-content: flex-start;
+  }
 
-    nav a {
-        flex: 0 0 auto;
-    }
-    
-    .nav-icon {
-        width: 20px;
-        height: 20px;
-    }
+  nav a {
+    flex: 0 0 auto;
+  }
+  
+  .nav-icon {
+    width: 20px;
+    height: 20px;
+  }
 
-    .dashboard-grid {
-        grid-template-columns: 1fr;
-    }
+  /* Dashboard optimalizálás */
+  .stats-grid {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .dashboard-controls {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .card-header select {
+    width: 100%;
+  }
+
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  /* Gombok és interakciók */
+  .view-all-btn {
+    width: 100%;
+    padding: 0.75rem;
+    margin-top: 0.5rem;
+  }
+
+  /* Lista elemek */
+  #recent-notes-list li,
+  #upcoming-appointments-list li {
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+  }
+
+  /* Tartalom olvashatóság */
+  .note-content,
+  .appointment-title {
+    font-size: 1rem;
+    line-height: 1.4;
+  }
+
+  .note-date,
+  .appointment-date {
+    font-size: 0.9rem;
+    color: #666;
+  }
+
+  /* Statisztikai kártyák */
+  .stat-card {
+    padding: 0.75rem;
+  }
+
+  .stat-card h4 {
+    font-size: 0.8rem;
+  }
+
+  .stat-card div {
+    font-size: 1.2rem;
+  }
+
+  /* Form elemek */
+  input, select, button {
+    padding: 0.75rem;
+    font-size: 1rem;
+  }
+}
+
+/* Még kisebb képernyőkre */
+@media (max-width: 480px) {
+  h2 {
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .dashboard-card {
+    margin-bottom: 1rem;
+  }
+
+  .stat-card {
+    padding: 0.5rem;
+  }
+
+  .dashboard-controls input,
+  .dashboard-controls select {
+    margin-bottom: 0.5rem;
+  }
 }
 
 /* Új stílusok a beállításokhoz */
