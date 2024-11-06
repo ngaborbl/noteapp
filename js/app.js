@@ -14,6 +14,62 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 const auth = firebase.auth();
 
+// FCM inicializálása
+async function initializeFirebaseMessaging() {
+  try {
+    const messaging = firebase.messaging();
+    
+    // Notification engedély kérése
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') {
+      console.log('Notification permission denied');
+      return;
+    }
+
+    // Token beszerzése
+    const currentToken = await messaging.getToken({
+      vapidKey: 'BMClsjpGPsNigxNlIC6vyY6q5bh2wy9xDCWeAD0bc8JX2l13zAwOXxxJzeQpchTz9YYvEkwH5xQ9LqZO8Vv0rZg'
+    });
+
+    if (currentToken) {
+      console.log('FCM Token:', currentToken);
+      
+      // Token mentése a user dokumentumába
+      const user = auth.currentUser;
+      if (user) {
+        await db.collection('users').doc(user.uid).update({
+          fcmToken: currentToken,
+          tokenUpdatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      }
+    } else {
+      console.log('No registration token available');
+    }
+
+    // Előtérben érkező üzenetek kezelése
+    messaging.onMessage((payload) => {
+      console.log('Received foreground message:', payload);
+      
+      const notificationTitle = payload.notification.title;
+      const notificationOptions = {
+        body: payload.notification.body,
+        icon: '/icons/calendar.png',
+        badge: '/icons/calendar.png',
+        data: payload.data
+      };
+
+      if ('serviceWorker' in navigator && 'Notification' in window) {
+        navigator.serviceWorker.ready.then(registration => {
+          registration.showNotification(notificationTitle, notificationOptions);
+        });
+      }
+    });
+
+  } catch (error) {
+    console.error('Error initializing Firebase Messaging:', error);
+  }
+}
+
 // Böngésző detektálás
 function detectBrowser() {
   if ((navigator.userAgent.indexOf("Opera") || navigator.userAgent.indexOf('OPR')) !== -1) {
@@ -225,19 +281,19 @@ function setupLocalNotifications() {
 // Alkalmazás inicializálása
 function initApp() {
   console.log("Alkalmazás inicializálása...");
-  // A menüsor alapértelmezetten rejtett
   const navElement = document.querySelector('nav');
   navElement.style.display = 'none';
   
   auth.onAuthStateChanged((user) => {
     if (user) {
       console.log("Felhasználó bejelentkezve:", user.email);
-      // Menüsor megjelenítése bejelentkezéskor
       navElement.style.display = 'flex';
       showModule('dashboard');
+      
+      // FCM inicializálása bejelentkezés után
+      initializeFirebaseMessaging();
     } else {
       console.log("Nincs bejelentkezett felhasználó");
-      // Menüsor elrejtése kijelentkezéskor
       navElement.style.display = 'none';
       showLoginForm();
     }
