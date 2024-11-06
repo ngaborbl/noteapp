@@ -953,18 +953,6 @@ function loadProfile() {
   contentElement.innerHTML = `
     <h2>Profil beállítások</h2>
     <div class="profile-container">
-      <div class="profile-section">
-        <div class="avatar-container">
-          <div id="avatar-preview" style="background-color: #4CAF50;">
-            <!-- Avatar kezdőbetű vagy kép -->
-          </div>
-          <input type="file" id="avatar-upload" accept="image/*" style="display: none;">
-          <button onclick="document.getElementById('avatar-upload').click()" class="secondary-button">
-            Profilkép módosítása
-          </button>
-        </div>
-      </div>
-
       <form id="profile-form" class="profile-section">
         <div class="form-group">
           <label for="display-name">Megjelenített név</label>
@@ -974,11 +962,6 @@ function loadProfile() {
         <div class="form-group">
           <label for="email">Email cím</label>
           <input type="email" id="email" disabled>
-        </div>
-
-        <div class="form-group">
-          <label for="phone">Telefonszám</label>
-          <input type="tel" id="phone" placeholder="Opcionális">
         </div>
 
         <div class="form-group">
@@ -1021,11 +1004,7 @@ function loadProfile() {
     </div>
   `;
 
-  // Események kezelése
   document.getElementById('profile-form').addEventListener('submit', saveProfile);
-  document.getElementById('avatar-upload').addEventListener('change', handleAvatarUpload);
-  
-  // Profil adatok betöltése
   loadProfileData();
 }
 
