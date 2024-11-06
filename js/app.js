@@ -16,58 +16,78 @@ const auth = firebase.auth();
 
 // FCM inicializálása
 async function initializeFirebaseMessaging() {
-  try {
-    const messaging = firebase.messaging();
-    
-    // Notification engedély kérése
-    const permission = await Notification.requestPermission();
-    if (permission !== 'granted') {
-      console.log('Notification permission denied');
-      return;
-    }
+ try {
+   // Log: Kezdés
+   console.log('FCM inicializálás kezdése...');
+   
+   // Firebase Messaging példány létrehozása
+   const messaging = firebase.messaging();
+   console.log('Messaging objektum létrehozva');
+   
+   // Értesítési engedély kérése
+   const permission = await Notification.requestPermission();
+   console.log('Értesítési engedély:', permission);
+   
+   // Ha nincs engedély, kilépünk
+   if (permission !== 'granted') {
+     console.log('Értesítési engedély megtagadva');
+     return;
+   }
 
-    // Token beszerzése
-    const currentToken = await messaging.getToken({
-      vapidKey: 'BMClsjpGPsNigxNlIC6vyY6q5bh2wy9xDCWeAD0bc8JX2l13zAwOXxxJzeQpchTz9YYvEkwH5xQ9LqZO8Vv0rZg'
-    });
+   // Token kérése a Firebase-től
+   console.log('Token kérése...');
+   const currentToken = await messaging.getToken({
+     vapidKey: 'BMClsjpGPsNigxNlIC6vyY6q5bh2wy9xDCWeAD0bc8JX2l13zAwOXxxJzeQpchTz9YYvEkwH5xQ9LqZO8Vv0rZg'
+   });
 
-    if (currentToken) {
-      console.log('FCM Token:', currentToken);
-      
-      // Token mentése a user dokumentumába
-      const user = auth.currentUser;
-      if (user) {
-        await db.collection('users').doc(user.uid).update({
-          fcmToken: currentToken,
-          tokenUpdatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-      }
-    } else {
-      console.log('No registration token available');
-    }
+   // Ha sikerült tokent szerezni
+   if (currentToken) {
+     console.log('FCM Token megszerezve:', currentToken);
+     
+     // Az aktuális bejelentkezett felhasználó lekérése
+     const user = auth.currentUser;
+     if (user) {
+       // Token mentése a felhasználó dokumentumába
+       console.log('Token mentése a user dokumentumba...');
+       await db.collection('users').doc(user.uid).update({
+         fcmToken: currentToken,
+         tokenUpdatedAt: firebase.firestore.FieldValue.serverTimestamp()
+       });
+       console.log('Token sikeresen mentve');
+     }
+   } else {
+     console.log('Nem sikerült tokent szerezni');
+   }
 
-    // Előtérben érkező üzenetek kezelése
-    messaging.onMessage((payload) => {
-      console.log('Received foreground message:', payload);
-      
-      const notificationTitle = payload.notification.title;
-      const notificationOptions = {
-        body: payload.notification.body,
-        icon: '/icons/calendar.png',
-        badge: '/icons/calendar.png',
-        data: payload.data
-      };
+   // Előtérben érkező üzenetek kezelése
+   messaging.onMessage((payload) => {
+     console.log('Foreground üzenet érkezett:', payload);
+     
+     const notificationTitle = payload.notification.title;
+     const notificationOptions = {
+       body: payload.notification.body,
+       icon: '/icons/calendar.png',
+       badge: '/icons/calendar.png',
+       data: payload.data
+     };
 
-      if ('serviceWorker' in navigator && 'Notification' in window) {
-        navigator.serviceWorker.ready.then(registration => {
-          registration.showNotification(notificationTitle, notificationOptions);
-        });
-      }
-    });
+     // Ha van Service Worker és Notification támogatás,
+     // megjelenítjük az értesítést
+     if ('serviceWorker' in navigator && 'Notification' in window) {
+       navigator.serviceWorker.ready.then(registration => {
+         registration.showNotification(notificationTitle, notificationOptions);
+       });
+     }
+   });
 
-  } catch (error) {
-    console.error('Error initializing Firebase Messaging:', error);
-  }
+   // Log: Befejezés
+   console.log('FCM inicializálás befejezve');
+   
+ } catch (error) {
+   // Hiba esetén részletes logging
+   console.error('Hiba az FCM inicializálásakor:', error);
+   throw error;
+ }
 }
 
 // Böngésző detektálás
@@ -238,73 +258,173 @@ function showLocalNotification(title, body, id) {
 
 // Módosítsuk az értesítések ellenőrzését
 async function checkUpcomingAppointments() {
-  const user = auth.currentUser;
-  if (!user) {
-    console.log('Nincs bejelentkezett felhasználó, időpontok ellenőrzése kihagyva');
-    return;
-  }
+ // Felhasználó ellenőrzése
+ const user = auth.currentUser;
+ if (!user) {
+   console.log('Időpontok ellenőrzése kihagyva: nincs bejelentkezett felhasználó');
+   return;
+ }
 
-  const now = new Date();
-  const notificationTime = parseInt(localStorage.getItem('notificationTime') || '30');
+ console.log('Időpontok ellenőrzése kezdődik:', user.email);
+ 
+ // Aktuális idő és beállítások
+ const now = new Date();
+ const notificationTime = parseInt(localStorage.getItem('notificationTime') || '30');
+ const notificationCount = parseInt(localStorage.getItem('notificationCount') || '1');
 
-  try {
-    const snapshot = await db.collection('appointments')
-      .where('userId', '==', user.uid)
-      .where('date', '>', now)
-      .get();
+ try {
+   // Időpontok lekérése
+   console.log('Közelgő időpontok lekérése a Firestore-ból...');
+   const snapshot = await db.collection('appointments')
+     .where('userId', '==', user.uid)
+     .where('date', '>', now)
+     .orderBy('date', 'asc')
+     .get();
 
-      // Csak bizonyos időpontokban értesítünk
-      const notifyAt = [15, 10, 5, 3, 1]; // percek
-      const shouldNotify = notifyAt.includes(Math.round(timeDiff));
+   if (snapshot.empty) {
+     console.log('Nincsenek közelgő időpontok');
+     return;
+   }
 
-      if (shouldNotify) {
-        const minutesText = Math.round(timeDiff);
-        const notificationText = `${appointment.title} időpont ${minutesText} perc múlva lesz!`;
+   console.log(`${snapshot.size} időpont található, ellenőrzés kezdése...`);
 
-        showLocalNotification(
-          '🔔 Közelgő időpont',
-          notificationText,
-          doc.id  // Az időpont egyedi azonosítója
-        );
-      }
-    });
-  } catch (error) {
-    console.error('Hiba az időpontok ellenőrzésekor:', error);
-  }
+   // Időpontok feldolgozása
+   snapshot.forEach(doc => {
+     const appointment = doc.data();
+     const appointmentDate = appointment.date.toDate();
+     const timeDiff = (appointmentDate - now) / (1000 * 60); // különbség percekben
+
+     // Log az időpont adatairól
+     console.log('Időpont vizsgálata:', {
+       title: appointment.title,
+       date: appointmentDate,
+       timeUntil: Math.round(timeDiff) + ' perc'
+     });
+
+     // Értesítési időpontok beállítása a felhasználói beállítások alapján
+     let notifyAt = [];
+     if (notificationCount === 1) {
+       notifyAt = [notificationTime];
+     } else if (notificationCount === 2) {
+       notifyAt = [notificationTime, Math.ceil(notificationTime/2)];
+     } else if (notificationCount === 3) {
+       notifyAt = [notificationTime, Math.ceil(notificationTime/2), 5];
+     }
+
+     // Ellenőrizzük, hogy kell-e értesítést küldeni
+     const shouldNotify = notifyAt.some(time => 
+       Math.abs(Math.round(timeDiff) - time) < 1
+     );
+
+     if (shouldNotify) {
+       const minutesText = Math.round(timeDiff);
+       const notificationText = `${appointment.title} időpont ${minutesText} perc múlva lesz!`;
+       
+       console.log('Értesítés küldése:', {
+         title: appointment.title,
+         timeUntil: minutesText,
+         notificationId: doc.id
+       });
+
+       // Értesítés küldése
+       showLocalNotification(
+         '🔔 Közelgő időpont',
+         notificationText,
+         doc.id  // Az időpont egyedi azonosítója
+       ).then(() => {
+         console.log('Értesítés sikeresen elküldve:', doc.id);
+       }).catch(error => {
+         console.error('Hiba az értesítés küldésekor:', error);
+       });
+     } else {
+       console.log('Nincs szükség értesítésre ennél az időpontnál');
+     }
+   });
+
+   console.log('Időpontok ellenőrzése befejezve');
+
+ } catch (error) {
+   console.error('Hiba az időpontok ellenőrzésekor:', error);
+   // Részletes hibaüzenet logolása
+   if (error.code) {
+     console.error('Hiba kód:', error.code);
+   }
+   if (error.message) {
+     console.error('Hiba üzenet:', error.message);
+   }
+ }
 }
 
 // Módosítsuk az értesítések időzítését
 function setupLocalNotifications() {
   console.log('Értesítések figyelése elindítva');
-  checkUpcomingAppointments(); // Azonnali első ellenőrzés
-  setInterval(checkUpcomingAppointments, 30000); // 30 másodpercenként
+  
+  setInterval(() => {
+    if (auth.currentUser) {
+      checkUpcomingAppointments();
+    }
+  }, 30000);
 }
 
 // Alkalmazás inicializálása
 function initApp() {
-  console.log("Alkalmazás inicializálása...");
-  const navElement = document.querySelector('nav');
-  navElement.style.display = 'none';
-  
-  auth.onAuthStateChanged((user) => {
-    if (user) {
-      console.log("Felhasználó bejelentkezve:", user.email);
-      navElement.style.display = 'flex';
-      showModule('dashboard');
-      
-      // FCM inicializálása bejelentkezés után
-      console.log("FCM inicializálás kezdése...");
-      initializeFirebaseMessaging().then(() => {
-        console.log("FCM inicializálás sikeres");
-      }).catch(error => {
-        console.error("FCM inicializálás hiba:", error);
-      });
-    } else {
-      console.log("Nincs bejelentkezett felhasználó");
-      navElement.style.display = 'none';
-      showLoginForm();
-    }
-  });
+ console.log("Alkalmazás inicializálása...");
+ const navElement = document.querySelector('nav');
+ navElement.style.display = 'none';
+ 
+ // Felhasználó bejelentkezési státusz figyelése
+ auth.onAuthStateChanged(async (user) => {
+   if (user) {
+     // Bejelentkezett állapot
+     console.log("Felhasználó bejelentkezve:", user.email);
+     navElement.style.display = 'flex';
+     
+     try {
+       // FCM inicializálása és első időpont ellenőrzés
+       console.log("FCM inicializálás kezdeményezése...");
+       await initializeFirebaseMessaging();
+       console.log("FCM inicializálás sikeres, időpontok ellenőrzése kezdődik");
+       await checkUpcomingAppointments();
+     } catch (error) {
+       console.error("Hiba az inicializálás során:", error);
+     }
+
+     // Dashboard betöltése
+     showModule('dashboard');
+     
+   } else {
+     // Kijelentkezett állapot
+     console.log("Nincs bejelentkezett felhasználó");
+     navElement.style.display = 'none';
+     showLoginForm();
+   }
+ });
+
+ // Csak akkor indítjuk az időpontok rendszeres ellenőrzését,
+ // ha van Service Worker támogatás
+ if ('serviceWorker' in navigator) {
+   // Service Worker regisztráció
+   window.addEventListener('load', async function() {
+     try {
+       const registration = await navigator.serviceWorker.register('service-worker.js');
+       console.log('Service Worker sikeresen regisztrálva:', registration);
+       
+       // Időpontok rendszeres ellenőrzése
+       setInterval(() => {
+         if (auth.currentUser) {
+           checkUpcomingAppointments();
+         } else {
+           console.log('Időpont ellenőrzés kihagyva - nincs bejelentkezett felhasználó');
+         }
+       }, 30000); // 30 másodpercenként
+       
+     } catch (error) {
+       console.error('Service Worker regisztrációs hiba:', error);
+     }
+   });
+ } else {
+   console.log('A böngésző nem támogatja a Service Worker-t');
+ }
 }
 
 // Modulok megjelenítése
