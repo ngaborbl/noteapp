@@ -500,8 +500,8 @@ body.dark .view-all-btn:hover {
 
 /* User Welcome Section styles */
 .user-welcome-section {
-  margin-bottom: 2rem;
-  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  padding: 1rem 1.5rem;
   background: white;
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
@@ -509,18 +509,25 @@ body.dark .view-all-btn:hover {
 
 .user-info h2 {
   margin: 0;
-  font-size: 1.5rem;
+  font-size: 1.3rem;
+  font-weight: 500;
   border-bottom: none;
+  color: #333;
 }
 
 .user-info p {
   margin: 0.25rem 0 0;
   color: #666;
+  font-size: 0.9rem;
 }
 
 /* Dark theme support */
 body.dark .user-welcome-section {
   background: #2a2a2a;
+}
+
+body.dark .user-info h2 {
+  color: #fff;
 }
 
 body.dark .user-info p {
@@ -530,11 +537,11 @@ body.dark .user-info p {
 /* Mobile optimization */
 @media (max-width: 768px) {
   .user-welcome-section {
-    text-align: center;
-    padding: 1rem;
+    margin-bottom: 1rem;
+    padding: 0.75rem 1rem;
   }
 
-  .user-info h2 {
-    font-size: 1.25rem;
+  .stats-grid {
+    margin-top: 0;  /* Extra helyet nyerünk */
   }
 }

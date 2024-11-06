@@ -280,11 +280,8 @@ function loadDashboard() {
   contentElement.innerHTML = `
     <!-- User Info Section -->
     <div class="user-welcome-section">
-      <div class="avatar-display" id="dashboard-avatar">
-        ${user.displayName ? user.displayName[0].toUpperCase() : user.email[0].toUpperCase()}
-      </div>
       <div class="user-info">
-        <h2>Üdvözöljük, ${user.displayName || 'Felhasználó'}!</h2>
+        <h2>${user.displayName || 'Felhasználó'}</h2>
         <p>${user.email}</p>
       </div>
     </div>
