@@ -497,3 +497,61 @@ body.dark .view-all-btn {
 body.dark .view-all-btn:hover {
   background-color: #444;
 }
+
+/* User Welcome Section styles */
+.user-welcome-section {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  padding: 1.5rem;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.avatar-display {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background-color: #4CAF50;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+.user-info h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  border-bottom: none;
+}
+
+.user-info p {
+  margin: 0.25rem 0 0;
+  color: #666;
+}
+
+/* Dark theme support */
+body.dark .user-welcome-section {
+  background: #2a2a2a;
+}
+
+body.dark .user-info p {
+  color: #999;
+}
+
+/* Mobile optimization */
+@media (max-width: 768px) {
+  .user-welcome-section {
+    flex-direction: column;
+    text-align: center;
+    padding: 1rem;
+  }
+
+  .user-info h2 {
+    font-size: 1.25rem;
+  }
+}
