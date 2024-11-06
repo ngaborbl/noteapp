@@ -285,7 +285,6 @@ function loadDashboard() {
         <p>${user.email}</p>
       </div>
     </div>
-    <h2>Dashboard</h2>
     
     <!-- Statisztikai kártyák -->
     <div class="stats-grid">
