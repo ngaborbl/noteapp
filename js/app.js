@@ -238,18 +238,20 @@ function showLocalNotification(title, body, id) {
 
 // Módosítsuk az értesítések ellenőrzését
 async function checkUpcomingAppointments() {
+  const user = auth.currentUser;
+  if (!user) {
+    console.log('Nincs bejelentkezett felhasználó, időpontok ellenőrzése kihagyva');
+    return;
+  }
+
   const now = new Date();
   const notificationTime = parseInt(localStorage.getItem('notificationTime') || '30');
 
   try {
     const snapshot = await db.collection('appointments')
+      .where('userId', '==', user.uid)
       .where('date', '>', now)
       .get();
-
-    snapshot.forEach(doc => {
-      const appointment = doc.data();
-      const appointmentDate = appointment.date.toDate();
-      const timeDiff = (appointmentDate - now) / (1000 * 60);
 
       // Csak bizonyos időpontokban értesítünk
       const notifyAt = [15, 10, 5, 3, 1]; // percek
@@ -291,7 +293,12 @@ function initApp() {
       showModule('dashboard');
       
       // FCM inicializálása bejelentkezés után
-      initializeFirebaseMessaging();
+      console.log("FCM inicializálás kezdése...");
+      initializeFirebaseMessaging().then(() => {
+        console.log("FCM inicializálás sikeres");
+      }).catch(error => {
+        console.error("FCM inicializálás hiba:", error);
+      });
     } else {
       console.log("Nincs bejelentkezett felhasználó");
       navElement.style.display = 'none';
