@@ -263,6 +263,9 @@ function showModule(moduleId) {
     case 'settings':
       loadSettings();
       break;
+    case 'profile':
+      loadProfile();
+      break;
     default:
       contentElement.innerHTML = `<h2>${moduleId.charAt(0).toUpperCase() + moduleId.slice(1)}</h2>
                                   <p>Ez a ${moduleId} modul tartalma.</p>`;
@@ -930,6 +933,209 @@ function saveSettings(e) {
   applyTheme(theme);
   
   alert('Beállítások sikeresen mentve!');
+}
+
+// Profil betöltése
+function loadProfile() {
+  const contentElement = document.getElementById('content');
+  contentElement.innerHTML = `
+    <h2>Profil beállítások</h2>
+    <div class="profile-container">
+      <div class="profile-section">
+        <div class="avatar-container">
+          <div id="avatar-preview" style="background-color: #4CAF50;">
+            <!-- Avatar kezdőbetű vagy kép -->
+          </div>
+          <input type="file" id="avatar-upload" accept="image/*" style="display: none;">
+          <button onclick="document.getElementById('avatar-upload').click()" class="secondary-button">
+            Profilkép módosítása
+          </button>
+        </div>
+      </div>
+
+      <form id="profile-form" class="profile-section">
+        <div class="form-group">
+          <label for="display-name">Megjelenített név</label>
+          <input type="text" id="display-name" required>
+        </div>
+
+        <div class="form-group">
+          <label for="email">Email cím</label>
+          <input type="email" id="email" disabled>
+        </div>
+
+        <div class="form-group">
+          <label for="phone">Telefonszám</label>
+          <input type="tel" id="phone" placeholder="Opcionális">
+        </div>
+
+        <div class="form-group">
+          <label>Értesítési beállítások</label>
+          <div class="checkbox-group">
+            <label>
+              <input type="checkbox" id="email-notifications">
+              Email értesítések
+            </label>
+            <label>
+              <input type="checkbox" id="push-notifications">
+              Push értesítések
+            </label>
+          </div>
+        </div>
+
+        <div class="button-group">
+          <button type="submit" class="primary-button">Mentés</button>
+          <button type="button" onclick="changePassword()" class="secondary-button">Jelszó módosítása</button>
+        </div>
+      </form>
+
+      <div class="profile-section">
+        <h3>Fiók információk</h3>
+        <div class="info-grid">
+          <div class="info-item">
+            <span>Regisztráció dátuma</span>
+            <span id="registration-date">-</span>
+          </div>
+          <div class="info-item">
+            <span>Jegyzetek száma</span>
+            <span id="notes-count">-</span>
+          </div>
+          <div class="info-item">
+            <span>Időpontok száma</span>
+            <span id="appointments-count">-</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Események kezelése
+  document.getElementById('profile-form').addEventListener('submit', saveProfile);
+  document.getElementById('avatar-upload').addEventListener('change', handleAvatarUpload);
+  
+  // Profil adatok betöltése
+  loadProfileData();
+}
+
+// Profil adatok betöltése
+async function loadProfileData() {
+  try {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    // Alapadatok betöltése
+    document.getElementById('email').value = user.email;
+    document.getElementById('display-name').value = user.displayName || '';
+    
+    // Avatar betöltése/generálása
+    const avatarPreview = document.getElementById('avatar-preview');
+    if (user.photoURL) {
+      avatarPreview.style.backgroundImage = `url(${user.photoURL})`;
+      avatarPreview.innerHTML = '';
+    } else {
+      // Kezdőbetű megjelenítése
+      const initial = (user.displayName || user.email[0]).charAt(0).toUpperCase();
+      avatarPreview.innerHTML = initial;
+    }
+
+    // Felhasználói adatok lekérése Firestore-ból
+    const userDoc = await db.collection('users').doc(user.uid).get();
+    if (userDoc.exists) {
+      const userData = userDoc.data();
+      document.getElementById('phone').value = userData.phone || '';
+      document.getElementById('email-notifications').checked = userData.emailNotifications || false;
+      document.getElementById('push-notifications').checked = userData.pushNotifications || false;
+      
+      // Regisztráció dátuma
+      const regDate = user.metadata.creationTime;
+      document.getElementById('registration-date').textContent = 
+        new Date(regDate).toLocaleDateString('hu-HU');
+    }
+
+    // Statisztikák betöltése
+    const notesSnapshot = await db.collection('notes')
+      .where('userId', '==', user.uid)
+      .get();
+    document.getElementById('notes-count').textContent = notesSnapshot.size;
+
+    const appointmentsSnapshot = await db.collection('appointments')
+      .where('userId', '==', user.uid)
+      .get();
+    document.getElementById('appointments-count').textContent = appointmentsSnapshot.size;
+
+  } catch (error) {
+    console.error('Hiba a profil betöltésekor:', error);
+    alert('Hiba történt a profil adatok betöltésekor.');
+  }
+}
+
+// Profil mentése
+async function saveProfile(e) {
+  e.preventDefault();
+  const user = auth.currentUser;
+  if (!user) return;
+
+  try {
+    // Felhasználónév frissítése
+    const newDisplayName = document.getElementById('display-name').value;
+    await user.updateProfile({
+      displayName: newDisplayName
+    });
+
+    // Felhasználói adatok mentése Firestore-ba
+    await db.collection('users').doc(user.uid).set({
+      phone: document.getElementById('phone').value,
+      emailNotifications: document.getElementById('email-notifications').checked,
+      pushNotifications: document.getElementById('push-notifications').checked,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+
+    alert('Profil sikeresen mentve!');
+  } catch (error) {
+    console.error('Hiba a profil mentésekor:', error);
+    alert('Hiba történt a profil mentésekor.');
+  }
+}
+
+// Avatar feltöltés kezelése
+async function handleAvatarUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  try {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    // Avatar előnézet frissítése
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const avatarPreview = document.getElementById('avatar-preview');
+      avatarPreview.style.backgroundImage = `url(${e.target.result})`;
+      avatarPreview.innerHTML = '';
+    };
+    reader.readAsDataURL(file);
+
+    // TODO: Ide jöhet a fájl feltöltése Firebase Storage-ba
+    alert('A profilkép feltöltés funkció még fejlesztés alatt áll.');
+
+  } catch (error) {
+    console.error('Hiba a profilkép feltöltésekor:', error);
+    alert('Hiba történt a profilkép feltöltésekor.');
+  }
+}
+
+// Jelszó módosítás
+function changePassword() {
+  const email = auth.currentUser.email;
+  
+  auth.sendPasswordResetEmail(email)
+    .then(() => {
+      alert('Jelszó módosítási link elküldve az email címedre!');
+    })
+    .catch((error) => {
+      console.error('Hiba a jelszó módosítási email küldésekor:', error);
+      alert('Hiba történt a jelszó módosítási email küldésekor.');
+    });
 }
 
 // Téma alkalmazása
