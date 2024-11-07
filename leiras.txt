@@ -1,0 +1,94 @@
+Fájlstruktúra:
+
+Copynoteapp-pwa/
+├── css/
+│   └── style.css
+├── js/
+│   └── app.js
+├── fonts/
+│   └── BalooPaaji2-Regular.ttf
+├── icons/
+│   ├── dashboard.png
+│   ├── note.png
+│   ├── calendar.png
+│   ├── settings.png
+│   ├── profile.png
+│   ├── admin.png
+│   └── logout.png
+├── index.html
+├── manifest.json
+├── service-worker.js
+└── .vercel/
+
+Technológiák:
+
+
+Firebase (Authentication, Firestore)
+Vercel deployment
+PWA funkcionalitás
+Service Worker értesítésekhez
+
+
+Konfigurációs adatok:
+
+javascriptCopyconst firebaseConfig = {
+  apiKey: "AIzaSyBsQMs29I_kwN5idgcyAdz0etWfv7ymyz8",
+  authDomain: "noteapp-5c98e.firebaseapp.com",
+  projectId: "noteapp-5c98e",
+  storageBucket: "noteapp-5c98e.appspot.com",
+  messagingSenderId: "10607490745",
+  appId: "1:10607490745:web:5cdff4c9c5e78d7c798d68",
+  measurementId: "G-3NSSJ1FT7S"
+};
+
+Vercel project adatok:
+
+
+Project ID: prj_OZS6CDf0s3aUU4lC3DZVeCwAwooF
+Org ID: team_FkQlLWJcyg6CpmuZypJXhSd2
+
+
+Főbb collection-ök a Firestore-ban:
+
+
+notes
+appointments
+users
+
+
+A program jelenlegi állapota:
+
+Alapvető funkciók működnek:
+
+Bejelentkezés/Kijelentkezés
+Jegyzetek kezelése (létrehozás, szerkesztés, törlés)
+Időpontok kezelése (létrehozás, szerkesztés, törlés)
+Értesítési rendszer időpontokhoz
+Beállítások (téma, értesítések időzítése)
+Profil kezelés (név módosítása, jelszóváltoztatás)
+
+
+Felhasználói felület:
+
+Reszponzív design
+Világos/sötét téma támogatás
+Optimalizált dashboard elrendezés
+Felhasználóbarát üdvözlő panel
+
+
+Főbb módosítások az utolsó verzióban:
+
+Avatar eltávolítva
+Dashboard felirat eltávolítva
+Felhasználói név megjelenítés optimalizálva
+Mobilnézet javítva
+
+
+További fejlesztési lehetőségek:
+
+Jegyzetek kategorizálása
+Időpontok ismétlődése
+Részletesebb statisztikák
+Keresési funkció bővítése
+Csoportos műveletek
+Adatok exportálása
