@@ -10,7 +10,6 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
-// Cache kezelés
 const CACHE_NAME = 'noteapp-cache-v1';
 const urlsToCache = [
   '/',
@@ -21,11 +20,10 @@ const urlsToCache = [
 ];
 
 self.addEventListener('install', function(event) {
-  console.log('Service Worker telepítve');
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(function(cache) {
-        console.log('Cache megnyitva');
+        console.log('Opened cache');
         return cache.addAll(urlsToCache);
       })
   );
@@ -43,77 +41,16 @@ self.addEventListener('fetch', function(event) {
   );
 });
 
-// Firebase Cloud Messaging háttér üzenetek kezelése
+// FCM háttér üzenetek kezelése
 messaging.onBackgroundMessage(function(payload) {
-  console.log('Háttér üzenet érkezett:', payload);
+  console.log('[Service Worker] Háttér üzenet érkezett:', payload);
 
   const notificationTitle = payload.notification.title;
   const notificationOptions = {
     body: payload.notification.body,
     icon: '/icons/calendar.png',
-    badge: '/icons/calendar.png',
-    data: payload.data || {},
-    requireInteraction: true,
-    vibrate: [200, 100, 200]
+    badge: '/icons/calendar.png'
   };
 
   return self.registration.showNotification(notificationTitle, notificationOptions);
-});
-
-// Értesítésre kattintás kezelése
-self.addEventListener('notificationclick', function(event) {
-  console.log('Értesítésre kattintottak', event.notification);
-  event.notification.close();
-
-  // Ha van megadott URL az adatokban, azt nyitjuk meg
-  const urlToOpen = event.notification.data.url || '/';
-
-  event.waitUntil(
-    clients.matchAll({
-      type: 'window'
-    })
-    .then(function(clientList) {
-      // Ha van már nyitott ablak, azt használjuk
-      for (let client of clientList) {
-        if (client.url === urlToOpen && 'focus' in client) {
-          return client.focus();
-        }
-      }
-      // Ha nincs nyitott ablak, újat nyitunk
-      if (clients.openWindow) {
-        return clients.openWindow(urlToOpen);
-      }
-    })
-  );
-});
-
-// Push értesítések kezelése
-self.addEventListener('push', function(event) {
-  console.log('Push értesítés érkezett', event);
-
-  let notificationData = {};
-  
-  try {
-    notificationData = event.data.json();
-  } catch (e) {
-    notificationData = {
-      title: 'Értesítés',
-      body: event.data ? event.data.text() : 'Nincs üzenet tartalom'
-    };
-  }
-
-  const options = {
-    body: notificationData.body,
-    icon: '/icons/calendar.png',
-    badge: '/icons/calendar.png',
-    data: {
-      url: notificationData.url || '/'
-    },
-    requireInteraction: true,
-    vibrate: [200, 100, 200]
-  };
-
-  event.waitUntil(
-    self.registration.showNotification(notificationData.title, options)
-  );
 });
