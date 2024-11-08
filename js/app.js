@@ -27,23 +27,31 @@ async function initializeFirebaseMessaging() {
     const messaging = firebase.messaging();
     console.log('Messaging objektum létrehozva');
 
-    await messaging.requestPermission();
-    console.log('Értesítési engedély megszerezve');
+    // Az új módszer a Notification API használata
+    const permission = await Notification.requestPermission();
+    console.log('Értesítési engedély:', permission);
 
-    const token = await messaging.getToken();
-    if (token) {
-      console.log('FCM token:', token);
-      const user = auth.currentUser;
-      if (user) {
-        await db.collection('users').doc(user.uid).set({
-          fcmToken: token,
-          tokenUpdatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        }, { merge: true });
-        console.log('Token mentve a Firestore-ba');
+    if (permission === 'granted') {
+      try {
+        const token = await messaging.getToken();
+        console.log('FCM token:', token);
+        
+        const user = auth.currentUser;
+        if (user && token) {
+          await db.collection('users').doc(user.uid).set({
+            fcmToken: token,
+            tokenUpdatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          }, { merge: true });
+          console.log('Token mentve a Firestore-ba');
+        }
+        return token;
+      } catch (tokenError) {
+        console.error('Hiba a token generálásakor:', tokenError);
+        throw tokenError;
       }
+    } else {
+      console.log('Értesítési engedély megtagadva');
     }
-
-    return token;
   } catch (error) {
     console.error('Hiba az FCM inicializálásakor:', error);
     throw error;
