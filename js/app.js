@@ -19,61 +19,33 @@ async function initializeFirebaseMessaging() {
   try {
     console.log('FCM inicializálás kezdése...');
     
-    // Várjuk meg, hogy a service worker aktív legyen
-    const registration = await navigator.serviceWorker.ready;
-    console.log('Service Worker regisztráció kész:', registration);
-    
     if (!firebase.messaging.isSupported()) {
       console.log('Az FCM nem támogatott ezen a platformon');
       return;
     }
-    
+
     const messaging = firebase.messaging();
     console.log('Messaging objektum létrehozva');
-    
-    const permission = await Notification.requestPermission();
-    console.log('Értesítési engedély:', permission);
-    
-    if (permission !== 'granted') {
-      console.log('Értesítési engedély megtagadva');
-      return;
-    }
 
-    // Token kérése explicit registration-nel
-    console.log('Token kérése...');
-    try {
-      const currentToken = await messaging.getToken({
-        vapidKey: 'BMClsjpGPsNigxNlIC6vyY6q5bh2wy9xDCWeAD0bc8JX2l13zAwOXxxJzeQpchTz9YYvEkwH5xQ9LqZO8Vv0rZg',
-        serviceWorkerRegistration: registration // Ez a fő változtatás
-      });
+    await messaging.requestPermission();
+    console.log('Értesítési engedély megszerezve');
 
-      if (currentToken) {
-        console.log('FCM Token megszerezve:', currentToken);
-        
-        // Token mentése user dokumentumba
-        const user = auth.currentUser;
-        if (user) {
-          try {
-            await db.collection('users').doc(user.uid).set({
-              fcmToken: currentToken,
-              tokenUpdatedAt: firebase.firestore.FieldValue.serverTimestamp()
-            }, { merge: true });
-            console.log('Token mentve a Firestore-ba');
-          } catch (error) {
-            console.error('Hiba a token mentésekor:', error);
-          }
-        }
-      } else {
-        console.log('Nem sikerült tokent szerezni');
+    const token = await messaging.getToken();
+    if (token) {
+      console.log('FCM token:', token);
+      const user = auth.currentUser;
+      if (user) {
+        await db.collection('users').doc(user.uid).set({
+          fcmToken: token,
+          tokenUpdatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+        console.log('Token mentve a Firestore-ba');
       }
-    } catch (tokenError) {
-      console.error('Token generálási hiba:', tokenError);
-      throw tokenError;
     }
 
+    return token;
   } catch (error) {
     console.error('Hiba az FCM inicializálásakor:', error);
-    console.error('Hiba részletek:', error.code, error.message);
     throw error;
   }
 }
