@@ -699,6 +699,7 @@ function loadUpcomingAppointments(range = 'week') {
 
 // Jegyzetek betöltése
 function loadNotes() {
+  console.log("Jegyzetek betöltése kezdődik...");
   const contentElement = document.getElementById('content');
   contentElement.innerHTML = `
     <h2>Jegyzetek</h2>
@@ -712,18 +713,20 @@ function loadNotes() {
   
   const notesList = document.getElementById('notes-list');
   db.collection('notes')
-    // Itt töröljük a where feltételt
     .orderBy('timestamp', 'desc')
     .get()
     .then(snapshot => {
+      console.log("Lekért jegyzetek száma:", snapshot.size); // Debug log
       notesList.innerHTML = '';
       snapshot.forEach(doc => {
         const note = doc.data();
+        console.log("Jegyzet:", note); // Debug log - lássuk a jegyzet tartalmát
         const li = document.createElement('li');
         li.setAttribute('data-note-id', doc.id);
         li.id = doc.id;
         li.innerHTML = `
           <span class="note-content">${note.content}</span>
+          <span class="note-user">${note.userId}</span> <!-- Adjuk hozzá, hogy lássuk ki hozta létre -->
           <div class="note-actions">
             <button onclick="editNote('${doc.id}')">Szerkesztés</button>
             <button onclick="deleteNote('${doc.id}')">Törlés</button>
@@ -742,19 +745,26 @@ function addNote(e) {
   e.preventDefault();
   const newNoteInput = document.getElementById('new-note');
   const newNoteContent = newNoteInput.value;
+  console.log("Új jegyzet létrehozása:", newNoteContent); // Debug log
+  
   if (newNoteContent) {
-    db.collection('notes').add({
+    const noteData = {
       content: newNoteContent,
       userId: auth.currentUser.uid,
       timestamp: firebase.firestore.FieldValue.serverTimestamp()
-    })
-    .then(() => {
-      newNoteInput.value = '';
-      loadNotes();
-    })
-    .catch(error => {
-      console.error('Hiba a jegyzet hozzáadásakor:', error);
-    });
+    };
+    
+    console.log("Jegyzet adatok:", noteData); // Debug log
+    
+    db.collection('notes').add(noteData)
+      .then((docRef) => {
+        console.log("Jegyzet sikeresen létrehozva, ID:", docRef.id);
+        newNoteInput.value = '';
+        loadNotes();
+      })
+      .catch(error => {
+        console.error('Hiba a jegyzet hozzáadásakor:', error);
+      });
   }
 }
 
