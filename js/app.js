@@ -711,22 +711,23 @@ function loadNotes() {
   `;
   document.getElementById('new-note-form').addEventListener('submit', addNote);
   
+  console.log("Jegyzetek lekérdezése a Firestore-ból...");
   const notesList = document.getElementById('notes-list');
   db.collection('notes')
-    .orderBy('timestamp', 'desc')
-    .get()
+    .get()  // Egyszerűsítsük a lekérdezést
     .then(snapshot => {
-      console.log("Lekért jegyzetek száma:", snapshot.size); // Debug log
+      console.log("Firestore válasz:", snapshot);
+      console.log("Jegyzetek száma:", snapshot.size);
       notesList.innerHTML = '';
       snapshot.forEach(doc => {
         const note = doc.data();
-        console.log("Jegyzet:", note); // Debug log - lássuk a jegyzet tartalmát
+        console.log("Jegyzet adatok:", {id: doc.id, ...note});
         const li = document.createElement('li');
         li.setAttribute('data-note-id', doc.id);
         li.id = doc.id;
         li.innerHTML = `
           <span class="note-content">${note.content}</span>
-          <span class="note-user">${note.userId}</span> <!-- Adjuk hozzá, hogy lássuk ki hozta létre -->
+          <small>Létrehozta: ${note.userId}</small>
           <div class="note-actions">
             <button onclick="editNote('${doc.id}')">Szerkesztés</button>
             <button onclick="deleteNote('${doc.id}')">Törlés</button>
@@ -737,6 +738,7 @@ function loadNotes() {
     })
     .catch(error => {
       console.error('Hiba a jegyzetek betöltésekor:', error);
+      console.error('Hiba részletek:', error.code, error.message);
     });
 }
 
