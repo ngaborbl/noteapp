@@ -700,6 +700,13 @@ function loadUpcomingAppointments(range = 'week') {
 // Jegyzetek betöltése
 function loadNotes() {
   console.log("Jegyzetek betöltése kezdődik...");
+  
+  // Ha nincs bejelentkezett felhasználó, kilépünk
+  if (!auth.currentUser) {
+    console.log("Nincs bejelentkezett felhasználó");
+    return;
+  }
+
   const contentElement = document.getElementById('content');
   contentElement.innerHTML = `
     <h2>Jegyzetek</h2>
@@ -711,23 +718,35 @@ function loadNotes() {
   `;
   document.getElementById('new-note-form').addEventListener('submit', addNote);
   
-  console.log("Jegyzetek lekérdezése a Firestore-ból...");
   const notesList = document.getElementById('notes-list');
+  
+  // Query módosítása
   db.collection('notes')
-    .get()  // Egyszerűsítsük a lekérdezést
+    .get()
     .then(snapshot => {
-      console.log("Firestore válasz:", snapshot);
-      console.log("Jegyzetek száma:", snapshot.size);
+      console.log("Firestore válasz megérkezett");
+      console.log("Jegyzetek száma: " + snapshot.size);
+      
       notesList.innerHTML = '';
+      
+      if (snapshot.empty) {
+        console.log("Nincsenek jegyzetek");
+        notesList.innerHTML = '<li>Nincsenek jegyzetek</li>';
+        return;
+      }
+      
       snapshot.forEach(doc => {
         const note = doc.data();
-        console.log("Jegyzet adatok:", {id: doc.id, ...note});
+        console.log("Jegyzet:", note);
+        
         const li = document.createElement('li');
         li.setAttribute('data-note-id', doc.id);
         li.id = doc.id;
         li.innerHTML = `
-          <span class="note-content">${note.content}</span>
-          <small>Létrehozta: ${note.userId}</small>
+          <div>
+            <strong>Tartalom:</strong> ${note.content}<br>
+            <small>Létrehozta: ${note.userId || 'ismeretlen'}</small>
+          </div>
           <div class="note-actions">
             <button onclick="editNote('${doc.id}')">Szerkesztés</button>
             <button onclick="deleteNote('${doc.id}')">Törlés</button>
@@ -739,6 +758,7 @@ function loadNotes() {
     .catch(error => {
       console.error('Hiba a jegyzetek betöltésekor:', error);
       console.error('Hiba részletek:', error.code, error.message);
+      notesList.innerHTML = '<li>Hiba történt a jegyzetek betöltésekor</li>';
     });
 }
 
