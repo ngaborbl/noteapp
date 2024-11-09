@@ -147,55 +147,52 @@ function loadDashboard() {
 }
 
 // Dashboard statisztikák betöltése - javított verzió
+// Dashboard statisztikák betöltése - valós idejű verzió
 function loadDashboardStats() {
-  // Jegyzetek számának lekérése - minden jegyzet
-  db.collection('notes')
-    .get()
-    .then(snapshot => {
-      document.getElementById('notes-count').textContent = snapshot.size + ' db';
-    })
-    .catch(error => {
-      console.error('Hiba a jegyzetek számának lekérésekor:', error);
-      document.getElementById('notes-count').textContent = 'Hiba történt';
-    });
+  // Jegyzetek számának valós idejű követése
+  const notesQuery = db.collection('notes');
+  notesQuery.onSnapshot(snapshot => {
+    document.getElementById('notes-count').textContent = snapshot.size + ' db';
+  }, error => {
+    console.error('Hiba a jegyzetek számának lekérésekor:', error);
+    document.getElementById('notes-count').textContent = 'Hiba történt';
+  });
 
-  // Mai időpontok számának lekérése
+  // Mai időpontok számának valós idejű követése
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
 
-  db.collection('appointments')
+  const todayAppointmentsQuery = db.collection('appointments')
     .where('date', '>=', today)
-    .where('date', '<', tomorrow)
-    .get()
-    .then(snapshot => {
-      document.getElementById('today-appointments').textContent = snapshot.size + ' db';
-    })
-    .catch(error => {
-      console.error('Hiba a mai időpontok lekérésekor:', error);
-      document.getElementById('today-appointments').textContent = 'Hiba történt';
-    });
+    .where('date', '<', tomorrow);
 
-  // Következő időpont lekérése
-  db.collection('appointments')
+  todayAppointmentsQuery.onSnapshot(snapshot => {
+    document.getElementById('today-appointments').textContent = snapshot.size + ' db';
+  }, error => {
+    console.error('Hiba a mai időpontok lekérésekor:', error);
+    document.getElementById('today-appointments').textContent = 'Hiba történt';
+  });
+
+  // Következő időpont valós idejű követése
+  const nextAppointmentQuery = db.collection('appointments')
     .where('date', '>=', new Date())
-    .orderBy('date')
-    .limit(1)
-    .get()
-    .then(snapshot => {
-      if (!snapshot.empty) {
-        const nextAppointment = snapshot.docs[0].data();
-        document.getElementById('next-appointment').textContent = 
-          `${nextAppointment.title} - ${nextAppointment.date.toDate().toLocaleString('hu-HU')}`;
-      } else {
-        document.getElementById('next-appointment').textContent = 'Nincs közelgő időpont';
-      }
-    })
-    .catch(error => {
-      console.error('Hiba a következő időpont lekérésekor:', error);
-      document.getElementById('next-appointment').textContent = 'Hiba történt';
-    });
+    .orderBy('date', 'asc')
+    .limit(1);
+
+  nextAppointmentQuery.onSnapshot(snapshot => {
+    if (!snapshot.empty) {
+      const nextAppointment = snapshot.docs[0].data();
+      document.getElementById('next-appointment').textContent = 
+        `${nextAppointment.title} - ${nextAppointment.date.toDate().toLocaleString('hu-HU')}`;
+    } else {
+      document.getElementById('next-appointment').textContent = 'Nincs közelgő időpont';
+    }
+  }, error => {
+    console.error('Hiba a következő időpont lekérésekor:', error);
+    document.getElementById('next-appointment').textContent = 'Hiba történt';
+  });
 }
 
 // Dashboard események kezelése
@@ -586,13 +583,13 @@ function loadAppointments() {
     window.mainAppointmentsUnsubscribe();
   }
 
-  // Valós idejű query létrehozása
+  // Valós idejű query létrehozása - eltávolítva a userId szűrés
   const query = db.collection('appointments')
     .where('date', '>=', new Date())
     .orderBy('date', 'asc');
 
   // Valós idejű listener beállítása
-  window.mainAppointmentsUnsubscribe = query.onSnapshot((snapshot) => {
+  window.mainAppointmentsUnsubscribe = query.onSnapshot(snapshot => {
     console.log("Időpontok változás észlelve, darabszám:", snapshot.size);
     
     appointmentsList.innerHTML = '';
@@ -601,6 +598,7 @@ function loadAppointments() {
       appointmentsList.innerHTML = '<li class="empty-message">Nincsenek időpontok</li>';
       return;
     }
+
 
     snapshot.forEach(doc => {
       const appointment = doc.data();
@@ -651,50 +649,85 @@ function cleanupModules() {
   // Jegyzetek listener-ek eltávolítása
   if (window.notesUnsubscribe) {
     window.notesUnsubscribe();
+    window.notesUnsubscribe = null;
   }
   if (window.mainNotesUnsubscribe) {
     window.mainNotesUnsubscribe();
+    window.mainNotesUnsubscribe = null;
   }
   
   // Időpontok listener-ek eltávolítása
   if (window.appointmentsUnsubscribe) {
     window.appointmentsUnsubscribe();
+    window.appointmentsUnsubscribe = null;
   }
   if (window.mainAppointmentsUnsubscribe) {
     window.mainAppointmentsUnsubscribe();
+    window.mainAppointmentsUnsubscribe = null;
+  }
+
+  // Statisztika listener-ek eltávolítása
+  if (window.statsUnsubscribe) {
+    window.statsUnsubscribe.forEach(unsubscribe => unsubscribe());
+    window.statsUnsubscribe = [];
   }
 }
 
-// Módosított showModule függvény a cleanup-pal
-function showModule(moduleId) {
-  console.log("Modul megjelenítése:", moduleId);
-  
-  // Előző modul cleanup
-  cleanupModules();
-  
-  const contentElement = document.getElementById('content');
-  contentElement.innerHTML = '';
+// Módosított loadDashboardStats eleje
+function loadDashboardStats() {
+  // Listener-ek tárolása
+  window.statsUnsubscribe = [];
 
-  switch(moduleId) {
-    case 'dashboard':
-      loadDashboard();
-      break;
-    case 'notes':
-      loadNotes();
-      break;
-    case 'appointments':
-      loadAppointments();
-      break;
-    case 'settings':
-      loadSettings();
-      break;
-    case 'profile':
-      loadProfile();
-      break;
-    default:
-      contentElement.innerHTML = `<h2>${moduleId.charAt(0).toUpperCase() + moduleId.slice(1)}</h2>
-                                <p>Ez a ${moduleId} modul tartalma.</p>`;
-  }
+  // Jegyzetek számának valós idejű követése
+  const notesQuery = db.collection('notes');
+  window.statsUnsubscribe.push(
+    notesQuery.onSnapshot(snapshot => {
+      document.getElementById('notes-count').textContent = snapshot.size + ' db';
+    }, error => {
+      console.error('Hiba a jegyzetek számának lekérésekor:', error);
+      document.getElementById('notes-count').textContent = 'Hiba történt';
+    })
+  );
+
+  // Mai időpontok számának valós idejű követése
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  const todayAppointmentsQuery = db.collection('appointments')
+    .where('date', '>=', today)
+    .where('date', '<', tomorrow);
+
+  window.statsUnsubscribe.push(
+    todayAppointmentsQuery.onSnapshot(snapshot => {
+      document.getElementById('today-appointments').textContent = snapshot.size + ' db';
+    }, error => {
+      console.error('Hiba a mai időpontok lekérésekor:', error);
+      document.getElementById('today-appointments').textContent = 'Hiba történt';
+    })
+  );
+
+  // Következő időpont valós idejű követése
+  const nextAppointmentQuery = db.collection('appointments')
+    .where('date', '>=', new Date())
+    .orderBy('date', 'asc')
+    .limit(1);
+
+  window.statsUnsubscribe.push(
+    nextAppointmentQuery.onSnapshot(snapshot => {
+      if (!snapshot.empty) {
+        const nextAppointment = snapshot.docs[0].data();
+        document.getElementById('next-appointment').textContent = 
+          `${nextAppointment.title} - ${nextAppointment.date.toDate().toLocaleString('hu-HU')}`;
+      } else {
+        document.getElementById('next-appointment').textContent = 'Nincs közelgő időpont';
+      }
+    }, error => {
+      console.error('Hiba a következő időpont lekérésekor:', error);
+      document.getElementById('next-appointment').textContent = 'Hiba történt';
+    })
+  );
 }
 
 // Új időpont hozzáadása
