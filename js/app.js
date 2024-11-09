@@ -14,385 +14,26 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 const auth = firebase.auth();
 
-// FCM inicializálása
-async function initializeFirebaseMessaging() {
-  try {
-    console.log('FCM inicializálás kezdése...');
-    
-    if (!firebase.messaging.isSupported()) {
-      console.log('Az FCM nem támogatott ezen a platformon');
-      return;
-    }
-
-    const messaging = firebase.messaging();
-    console.log('Messaging objektum létrehozva');
-
-    // Az új módszer a Notification API használata
-    const permission = await Notification.requestPermission();
-    console.log('Értesítési engedély:', permission);
-
-    if (permission === 'granted') {
-      try {
-        const token = await messaging.getToken();
-        console.log('FCM token:', token);
-        
-        const user = auth.currentUser;
-        if (user && token) {
-          await db.collection('users').doc(user.uid).set({
-            fcmToken: token,
-            tokenUpdatedAt: firebase.firestore.FieldValue.serverTimestamp()
-          }, { merge: true });
-          console.log('Token mentve a Firestore-ba');
-        }
-        return token;
-      } catch (tokenError) {
-        console.error('Hiba a token generálásakor:', tokenError);
-        throw tokenError;
-      }
-    } else {
-      console.log('Értesítési engedély megtagadva');
-    }
-  } catch (error) {
-    console.error('Hiba az FCM inicializálásakor:', error);
-    throw error;
-  }
-}
-
-// Böngésző detektálás
-function detectBrowser() {
-  if ((navigator.userAgent.indexOf("Opera") || navigator.userAgent.indexOf('OPR')) !== -1) {
-    return 'opera';
-  } else if (navigator.userAgent.indexOf("Chrome") !== -1) {
-    return 'chrome';
-  } else if (navigator.userAgent.indexOf("Safari") !== -1) {
-    return 'safari';
-  } else if (navigator.userAgent.indexOf("Firefox") !== -1) {
-    return 'firefox';
-  } else {
-    return 'unknown';
-  }
-}
-
-// Alternatív értesítés Opera böngészőhöz
-function showBrowserNotification(title, body) {
-  // Létrehozunk egy fix pozíciójú div-et az értesítéshez
-  const notificationDiv = document.createElement('div');
-  notificationDiv.style.cssText = `
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    background: #333;
-    color: white;
-    padding: 15px;
-    border-radius: 5px;
-    z-index: 9999;
-    max-width: 300px;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    animation: slideIn 0.5s ease-out;
-  `;
-
-  notificationDiv.innerHTML = `
-    <div style="font-weight: bold; margin-bottom: 5px;">${title}</div>
-    <div>${body}</div>
-    <button style="
-      margin-top: 10px;
-      padding: 5px 10px;
-      border: none;
-      background: #4CAF50;
-      color: white;
-      border-radius: 3px;
-      cursor: pointer;
-    ">Bezárás</button>
-  `;
-
-  // CSS animáció hozzáadása
-  const style = document.createElement('style');
-  style.textContent = `
-    @keyframes slideIn {
-      from { transform: translateX(100%); opacity: 0; }
-      to { transform: translateX(0); opacity: 1; }
-    }
-  `;
-  document.head.appendChild(style);
-
-  // Bezárás gomb kezelése
-  const closeButton = notificationDiv.querySelector('button');
-  closeButton.onclick = () => {
-    notificationDiv.style.animation = 'slideOut 0.5s ease-in';
-    setTimeout(() => notificationDiv.remove(), 500);
-  };
-
-  // Automatikus eltűnés 10 másodperc után
-  setTimeout(() => {
-    if (document.body.contains(notificationDiv)) {
-      notificationDiv.style.animation = 'slideOut 0.5s ease-in';
-      setTimeout(() => notificationDiv.remove(), 500);
-    }
-  }, 10000);
-
-  document.body.appendChild(notificationDiv);
-}
-
-// Egyszerű értesítési rendszer
-function initializeNotifications() {
-  console.log('Értesítések inicializálása...');
-  
-  if (!('Notification' in window)) {
-    console.log('A böngésző nem támogatja az értesítéseket');
-    return;
-  }
-
-  Notification.requestPermission()
-    .then(permission => {
-      console.log('Értesítési engedély állapota:', permission);
-      if (permission === 'granted') {
-        console.log('Értesítési engedély megadva');
-        setupLocalNotifications();
-        
-        // Teszteljük az értesítéseket
-        setTimeout(() => {
-          showLocalNotification(
-            '🔔 Teszt értesítés',
-            'Az értesítési rendszer működik',
-            'test'
-          );
-        }, 3000);
-      }
-    })
-    .catch(error => {
-      console.error('Hiba az értesítési engedély kérésekor:', error);
-    });
-}
-
-// Helyi értesítések kezelése
-function showLocalNotification(title, body, id) {
-  console.log('Értesítés indítása:', { title, body, id, browser: detectBrowser() });
-  
-  if (!('Notification' in window)) {
-    console.log('A böngésző nem támogatja az értesítéseket');
-    return;
-  }
-
-  // Böngésző-specifikus kezelés
-  const browserType = detectBrowser();
-  if (browserType === 'opera') {
-    console.log('Opera böngésző észlelve, alternatív értesítési mód használata');
-    showBrowserNotification(title, body);
-    return;
-  }
-
-  // Ellenőrizzük, hogy volt-e már értesítés erről az időpontról az elmúlt percben
-  const lastNotification = localStorage.getItem(`lastNotification_${id}`);
-  const now = Date.now();
-  if (lastNotification && now - parseInt(lastNotification) < 60000) {
-    console.log('Túl gyakori értesítés, kihagyjuk:', id);
-    return;
-  }
-
-  if (Notification.permission === 'granted') {
-    try {
-      const notification = new Notification(title, {
-        body: body,
-        requireInteraction: true,
-        tag: `appointment-${id}`,
-        renotify: true,
-        silent: false,
-        vibrate: [200, 100, 200],
-        icon: '/icons/calendar.png',
-        badge: '/icons/calendar.png'
-      });
-
-      // Mentjük az értesítés időpontját
-      localStorage.setItem(`lastNotification_${id}`, now.toString());
-
-      notification.onclick = function() {
-        console.log('Értesítésre kattintás:', id);
-        window.focus();
-        this.close();
-      };
-
-      notification.onshow = function() {
-        console.log('Értesítés megjelenítve:', id);
-      };
-
-      console.log('Értesítés sikeresen létrehozva:', id);
-      return notification;
-    } catch (error) {
-      console.error('Értesítési hiba:', error);
-      showBrowserNotification(title, body);  // Fallback az egyedi értesítésre
-    }
-  }
-}
-
-// Módosítsuk az értesítések ellenőrzését
-async function checkUpcomingAppointments() {
- // Felhasználó ellenőrzése
- const user = auth.currentUser;
- if (!user) {
-   console.log('Időpontok ellenőrzése kihagyva: nincs bejelentkezett felhasználó');
-   return;
- }
-
- console.log('Időpontok ellenőrzése kezdődik:', user.email);
- 
- // Aktuális idő és beállítások
- const now = new Date();
- const notificationTime = parseInt(localStorage.getItem('notificationTime') || '30');
- const notificationCount = parseInt(localStorage.getItem('notificationCount') || '1');
-
- try {
-   // Időpontok lekérése
-   console.log('Közelgő időpontok lekérése a Firestore-ból...');
-   const snapshot = await db.collection('appointments')
-     .where('userId', '==', user.uid)
-     .where('date', '>', now)
-     .orderBy('date', 'asc')
-     .get();
-
-   if (snapshot.empty) {
-     console.log('Nincsenek közelgő időpontok');
-     return;
-   }
-
-   console.log(`${snapshot.size} időpont található, ellenőrzés kezdése...`);
-
-   // Időpontok feldolgozása
-   snapshot.forEach(doc => {
-     const appointment = doc.data();
-     const appointmentDate = appointment.date.toDate();
-     const timeDiff = (appointmentDate - now) / (1000 * 60); // különbség percekben
-
-     // Log az időpont adatairól
-     console.log('Időpont vizsgálata:', {
-       title: appointment.title,
-       date: appointmentDate,
-       timeUntil: Math.round(timeDiff) + ' perc'
-     });
-
-     // Értesítési időpontok beállítása a felhasználói beállítások alapján
-     let notifyAt = [];
-     if (notificationCount === 1) {
-       notifyAt = [notificationTime];
-     } else if (notificationCount === 2) {
-       notifyAt = [notificationTime, Math.ceil(notificationTime/2)];
-     } else if (notificationCount === 3) {
-       notifyAt = [notificationTime, Math.ceil(notificationTime/2), 5];
-     }
-
-     // Ellenőrizzük, hogy kell-e értesítést küldeni
-     const shouldNotify = notifyAt.some(time => 
-       Math.abs(Math.round(timeDiff) - time) < 1
-     );
-
-     if (shouldNotify) {
-       const minutesText = Math.round(timeDiff);
-       const notificationText = `${appointment.title} időpont ${minutesText} perc múlva lesz!`;
-       
-       console.log('Értesítés küldése:', {
-         title: appointment.title,
-         timeUntil: minutesText,
-         notificationId: doc.id
-       });
-
-       // Értesítés küldése
-       showLocalNotification(
-         '🔔 Közelgő időpont',
-         notificationText,
-         doc.id  // Az időpont egyedi azonosítója
-       ).then(() => {
-         console.log('Értesítés sikeresen elküldve:', doc.id);
-       }).catch(error => {
-         console.error('Hiba az értesítés küldésekor:', error);
-       });
-     } else {
-       console.log('Nincs szükség értesítésre ennél az időpontnál');
-     }
-   });
-
-   console.log('Időpontok ellenőrzése befejezve');
-
- } catch (error) {
-   console.error('Hiba az időpontok ellenőrzésekor:', error);
-   // Részletes hibaüzenet logolása
-   if (error.code) {
-     console.error('Hiba kód:', error.code);
-   }
-   if (error.message) {
-     console.error('Hiba üzenet:', error.message);
-   }
- }
-}
-
-// Módosítsuk az értesítések időzítését
-function setupLocalNotifications() {
-  console.log('Értesítések figyelése elindítva');
-  
-  setInterval(() => {
-    if (auth.currentUser) {
-      checkUpcomingAppointments();
-    }
-  }, 30000);
-}
-
 // Alkalmazás inicializálása
 function initApp() {
- console.log("Alkalmazás inicializálása...");
- const navElement = document.querySelector('nav');
- navElement.style.display = 'none';
- 
- // Felhasználó bejelentkezési státusz figyelése
- auth.onAuthStateChanged(async (user) => {
-   if (user) {
-     // Bejelentkezett állapot
-     console.log("Felhasználó bejelentkezve:", user.email);
-     navElement.style.display = 'flex';
-     
-     try {
-       // FCM inicializálása és első időpont ellenőrzés
-       console.log("FCM inicializálás kezdeményezése...");
-       await initializeFirebaseMessaging();
-       console.log("FCM inicializálás sikeres, időpontok ellenőrzése kezdődik");
-       await checkUpcomingAppointments();
-     } catch (error) {
-       console.error("Hiba az inicializálás során:", error);
-     }
-
-     // Dashboard betöltése
-     showModule('dashboard');
-     
-   } else {
-     // Kijelentkezett állapot
-     console.log("Nincs bejelentkezett felhasználó");
-     navElement.style.display = 'none';
-     showLoginForm();
-   }
- });
-
- // Csak akkor indítjuk az időpontok rendszeres ellenőrzését,
- // ha van Service Worker támogatás
- if ('serviceWorker' in navigator) {
-   // Service Worker regisztráció
-   window.addEventListener('load', async function() {
-     try {
-       const registration = await navigator.serviceWorker.register('service-worker.js');
-       console.log('Service Worker sikeresen regisztrálva:', registration);
-       
-       // Időpontok rendszeres ellenőrzése
-       setInterval(() => {
-         if (auth.currentUser) {
-           checkUpcomingAppointments();
-         } else {
-           console.log('Időpont ellenőrzés kihagyva - nincs bejelentkezett felhasználó');
-         }
-       }, 30000); // 30 másodpercenként
-       
-     } catch (error) {
-       console.error('Service Worker regisztrációs hiba:', error);
-     }
-   });
- } else {
-   console.log('A böngésző nem támogatja a Service Worker-t');
- }
+  console.log("Alkalmazás inicializálása...");
+  const navElement = document.querySelector('nav');
+  navElement.style.display = 'none';
+  
+  // Felhasználó bejelentkezési státusz figyelése
+  auth.onAuthStateChanged((user) => {
+    if (user) {
+      // Bejelentkezett állapot
+      console.log("Felhasználó bejelentkezve:", user.email);
+      navElement.style.display = 'flex';
+      showModule('dashboard');
+    } else {
+      // Kijelentkezett állapot
+      console.log("Nincs bejelentkezett felhasználó");
+      navElement.style.display = 'none';
+      showLoginForm();
+    }
+  });
 }
 
 // Modulok megjelenítése
@@ -419,10 +60,11 @@ function showModule(moduleId) {
       break;
     default:
       contentElement.innerHTML = `<h2>${moduleId.charAt(0).toUpperCase() + moduleId.slice(1)}</h2>
-                                  <p>Ez a ${moduleId} modul tartalma.</p>`;
+                                <p>Ez a ${moduleId} modul tartalma.</p>`;
   }
 }
 
+// Dashboard betöltése
 // Dashboard betöltése
 function loadDashboard() {
   const contentElement = document.getElementById('content');
@@ -504,9 +146,11 @@ function loadDashboard() {
   setupDashboardEvents();
 }
 
+// Dashboard statisztikák betöltése - javított verzió
 function loadDashboardStats() {
-  // Jegyzetek számának lekérése
-  db.collection('notes').where('userId', '==', auth.currentUser.uid).get()
+  // Jegyzetek számának lekérése - minden jegyzet
+  db.collection('notes')
+    .get()
     .then(snapshot => {
       document.getElementById('notes-count').textContent = snapshot.size + ' db';
     })
@@ -522,7 +166,6 @@ function loadDashboardStats() {
   tomorrow.setDate(tomorrow.getDate() + 1);
 
   db.collection('appointments')
-    .where('userId', '==', auth.currentUser.uid)
     .where('date', '>=', today)
     .where('date', '<', tomorrow)
     .get()
@@ -536,7 +179,6 @@ function loadDashboardStats() {
 
   // Következő időpont lekérése
   db.collection('appointments')
-    .where('userId', '==', auth.currentUser.uid)
     .where('date', '>=', new Date())
     .orderBy('date')
     .limit(1)
@@ -556,6 +198,7 @@ function loadDashboardStats() {
     });
 }
 
+// Dashboard események kezelése
 function setupDashboardEvents() {
   // Keresés kezelése
   const searchInput = document.getElementById('dashboard-search');
@@ -592,6 +235,7 @@ function setupDashboardEvents() {
   }
 }
 
+// Dashboard elemek szűrése
 function filterDashboardItems(searchTerm) {
   const filter = document.getElementById('dashboard-filter').value;
   
@@ -612,7 +256,69 @@ function filterDashboardItems(searchTerm) {
   }
 }
 
-// Jegyzetek valós idejű betöltése és frissítése
+// Közelgő időpontok betöltése - valós idejű verzió
+function loadUpcomingAppointments(range = 'week') {
+  const appointmentsList = document.getElementById('upcoming-appointments-list');
+  const now = new Date();
+  let endDate = new Date();
+
+  switch(range) {
+    case 'today':
+      endDate.setHours(23, 59, 59, 999);
+      break;
+    case 'week':
+      endDate.setDate(endDate.getDate() + 7);
+      break;
+    case 'month':
+      endDate.setMonth(endDate.getMonth() + 1);
+      break;
+  }
+
+  // Korábbi listener eltávolítása ha létezik
+  if (window.appointmentsUnsubscribe) {
+    window.appointmentsUnsubscribe();
+  }
+
+  // Valós idejű query létrehozása
+  const query = db.collection('appointments')
+    .where('date', '>=', now)
+    .where('date', '<=', endDate)
+    .orderBy('date', 'asc')
+    .limit(5);
+
+  // Valós idejű listener beállítása
+  window.appointmentsUnsubscribe = query.onSnapshot((snapshot) => {
+    console.log("Időpontok változás észlelve, darabszám:", snapshot.size);
+    
+    appointmentsList.innerHTML = '';
+    if (snapshot.empty) {
+      appointmentsList.innerHTML = '<li class="empty-message">Nincsenek közelgő időpontok</li>';
+      return;
+    }
+
+    snapshot.forEach(doc => {
+      const appointment = doc.data();
+      const li = document.createElement('li');
+      li.setAttribute('data-appointment-id', doc.id);
+      
+      li.innerHTML = `
+        <div class="appointment-title">${appointment.title}</div>
+        <div class="appointment-date">
+          ${appointment.date.toDate().toLocaleString('hu-HU')}
+        </div>
+        <div class="appointment-creator">
+          Létrehozta: ${appointment.userId || 'ismeretlen'}
+        </div>
+      `;
+      appointmentsList.appendChild(li);
+    });
+  }, (error) => {
+    console.error('Hiba az időpontok valós idejű követésekor:', error);
+    appointmentsList.innerHTML = '<li class="error-message">Hiba történt az időpontok betöltésekor</li>';
+  });
+}
+
+// Legutóbbi jegyzetek betöltése
 function loadRecentNotes(sortOrder = 'newest') {
   console.log("Valós idejű jegyzet figyelés inicializálása...");
   const notesList = document.getElementById('recent-notes-list');
@@ -645,11 +351,10 @@ function loadRecentNotes(sortOrder = 'newest') {
       return;
     }
 
-    // Változások kezelése
-    snapshot.docChanges().forEach((change) => {
-      const note = change.doc.data();
+    snapshot.forEach(doc => {
+      const note = doc.data();
       const li = document.createElement('li');
-      li.setAttribute('data-note-id', change.doc.id);
+      li.setAttribute('data-note-id', doc.id);
       
       // Jegyzet HTML létrehozása
       li.innerHTML = `
@@ -664,102 +369,23 @@ function loadRecentNotes(sortOrder = 'newest') {
         </div>
       `;
 
-      // Animáció hozzáadása a változás típusa alapján
-      if (change.type === 'added') {
-        li.classList.add('note-added');
-      } else if (change.type === 'modified') {
-        li.classList.add('note-modified');
-      } else if (change.type === 'removed') {
-        li.classList.add('note-removed');
-      }
-
       // Lista elem hozzáadása/frissítése
-      if (change.type === 'added' || change.type === 'modified') {
-        // Ha új vagy módosított jegyzet, beszúrjuk a megfelelő helyre
-        if (sortOrder === 'newest') {
-          notesList.insertBefore(li, notesList.firstChild);
-        } else {
-          notesList.appendChild(li);
-        }
-      } else if (change.type === 'removed') {
-        // Ha törölt jegyzet, megkeressük és eltávolítjuk
-        const existingNote = notesList.querySelector(`[data-note-id="${change.doc.id}"]`);
-        if (existingNote) {
-          existingNote.remove();
-        }
+      if (sortOrder === 'newest') {
+        notesList.insertBefore(li, notesList.firstChild);
+      } else {
+        notesList.appendChild(li);
       }
     });
-
-    // Ha üres a lista a változások után
-    if (notesList.children.length === 0) {
-      notesList.innerHTML = '<li class="empty-message">Nincsenek jegyzetek</li>';
-    }
   }, (error) => {
     console.error('Hiba a jegyzetek valós idejű követésekor:', error);
     notesList.innerHTML = '<li class="error-message">Hiba történt a jegyzetek betöltésekor</li>';
   });
 }
 
-function loadUpcomingAppointments(range = 'week') {
-  const appointmentsList = document.getElementById('upcoming-appointments-list');
-  const now = new Date();
-  let endDate = new Date();
-
-  switch(range) {
-    case 'today':
-      endDate.setHours(23, 59, 59, 999);
-      break;
-    case 'week':
-      endDate.setDate(endDate.getDate() + 7);
-      break;
-    case 'month':
-      endDate.setMonth(endDate.getMonth() + 1);
-      break;
-  }
-
-  const query = db.collection('appointments')
-    .where('userId', '==', auth.currentUser.uid)
-    .where('date', '>=', now)
-    .where('date', '<=', endDate)
-    .orderBy('date', 'asc')
-    .limit(5);
-
-  query.get()
-    .then(snapshot => {
-      appointmentsList.innerHTML = '';
-      if (snapshot.empty) {
-        appointmentsList.innerHTML = '<li class="empty-message">Nincsenek közelgő időpontok</li>';
-        return;
-      }
-
-      snapshot.forEach(doc => {
-        const appointment = doc.data();
-        const li = document.createElement('li');
-        li.innerHTML = `
-          <div class="appointment-title">${appointment.title}</div>
-          <div class="appointment-date">
-            ${appointment.date.toDate().toLocaleString('hu-HU')}
-          </div>
-        `;
-        appointmentsList.appendChild(li);
-      });
-    })
-    .catch(error => {
-      console.error('Hiba az időpontok betöltésekor:', error);
-      appointmentsList.innerHTML = '<li class="error-message">Hiba történt az időpontok betöltésekor</li>';
-    });
-}
-
-// Jegyzetek betöltése
+// Jegyzetek oldal betöltése
 function loadNotes() {
   console.log("Jegyzetek betöltése kezdődik...");
   
-  // Ha nincs bejelentkezett felhasználó, kilépünk
-  if (!auth.currentUser) {
-    console.log("Nincs bejelentkezett felhasználó");
-    return;
-  }
-
   const contentElement = document.getElementById('content');
   contentElement.innerHTML = `
     <h2>Jegyzetek</h2>
@@ -769,50 +395,55 @@ function loadNotes() {
     </form>
     <ul id="notes-list"></ul>
   `;
+  
   document.getElementById('new-note-form').addEventListener('submit', addNote);
   
   const notesList = document.getElementById('notes-list');
   
-  // Query módosítása
-  db.collection('notes')
-    .get()
-    .then(snapshot => {
-      console.log("Firestore válasz megérkezett");
-      console.log("Jegyzetek száma: " + snapshot.size);
+  // Korábbi listener eltávolítása ha létezik
+  if (window.mainNotesUnsubscribe) {
+    window.mainNotesUnsubscribe();
+  }
+
+  // Valós idejű query létrehozása
+  const query = db.collection('notes')
+    .orderBy('timestamp', 'desc');
+
+  // Valós idejű listener beállítása
+  window.mainNotesUnsubscribe = query.onSnapshot((snapshot) => {
+    console.log("Jegyzetek változás észlelve, darabszám:", snapshot.size);
+    
+    notesList.innerHTML = '';
+    
+    if (snapshot.empty) {
+      notesList.innerHTML = '<li>Nincsenek jegyzetek</li>';
+      return;
+    }
+
+    snapshot.forEach(doc => {
+      const note = doc.data();
+      const li = document.createElement('li');
+      li.setAttribute('data-note-id', doc.id);
       
-      notesList.innerHTML = '';
-      
-      if (snapshot.empty) {
-        console.log("Nincsenek jegyzetek");
-        notesList.innerHTML = '<li>Nincsenek jegyzetek</li>';
-        return;
-      }
-      
-      snapshot.forEach(doc => {
-        const note = doc.data();
-        console.log("Jegyzet:", note);
-        
-        const li = document.createElement('li');
-        li.setAttribute('data-note-id', doc.id);
-        li.id = doc.id;
-        li.innerHTML = `
-          <div>
-            <strong>Tartalom:</strong> ${note.content}<br>
-            <small>Létrehozta: ${note.userId || 'ismeretlen'}</small>
+      li.innerHTML = `
+        <div class="note-content">
+          <strong>Tartalom:</strong> ${note.content}<br>
+          <small>Létrehozta: ${note.userId || 'ismeretlen'}</small>
+          <div class="note-date">
+            ${note.timestamp ? note.timestamp.toDate().toLocaleString('hu-HU') : 'Dátum nélkül'}
           </div>
-          <div class="note-actions">
-            <button onclick="editNote('${doc.id}')">Szerkesztés</button>
-            <button onclick="deleteNote('${doc.id}')">Törlés</button>
-          </div>
-        `;
-        notesList.appendChild(li);
-      });
-    })
-    .catch(error => {
-      console.error('Hiba a jegyzetek betöltésekor:', error);
-      console.error('Hiba részletek:', error.code, error.message);
-      notesList.innerHTML = '<li>Hiba történt a jegyzetek betöltésekor</li>';
+        </div>
+        <div class="note-actions">
+          <button onclick="editNote('${doc.id}')" class="edit-btn">Szerkesztés</button>
+          <button onclick="deleteNote('${doc.id}')" class="delete-btn">Törlés</button>
+        </div>
+      `;
+      notesList.appendChild(li);
     });
+  }, (error) => {
+    console.error('Hiba a jegyzetek valós idejű követésekor:', error);
+    notesList.innerHTML = '<li class="error-message">Hiba történt a jegyzetek betöltésekor</li>';
+  });
 }
 
 // Új jegyzet hozzáadása
@@ -820,7 +451,7 @@ function addNote(e) {
   e.preventDefault();
   const newNoteInput = document.getElementById('new-note');
   const newNoteContent = newNoteInput.value;
-  console.log("Új jegyzet létrehozása:", newNoteContent); // Debug log
+  console.log("Új jegyzet létrehozása:", newNoteContent);
   
   if (newNoteContent) {
     const noteData = {
@@ -829,13 +460,11 @@ function addNote(e) {
       timestamp: firebase.firestore.FieldValue.serverTimestamp()
     };
     
-    console.log("Jegyzet adatok:", noteData); // Debug log
-    
     db.collection('notes').add(noteData)
       .then((docRef) => {
         console.log("Jegyzet sikeresen létrehozva, ID:", docRef.id);
         newNoteInput.value = '';
-        loadNotes();
+        // A loadNotes() hívás eltávolítva, mert a listener kezeli
       })
       .catch(error => {
         console.error('Hiba a jegyzet hozzáadásakor:', error);
@@ -845,16 +474,13 @@ function addNote(e) {
 
 // Jegyzet szerkesztése
 function editNote(noteId) {
-  // Először lekérjük a jegyzet jelenlegi tartalmát
   db.collection('notes').doc(noteId).get()
     .then(doc => {
       if (doc.exists) {
         const note = doc.data();
-        // Létrehozunk egy szerkesztő űrlapot az aktuális tartalommal
-        const li = document.getElementById(noteId) || document.querySelector(`[data-note-id="${noteId}"]`);
+        const li = document.querySelector(`[data-note-id="${noteId}"]`);
         const originalContent = note.content;
         
-        // Űrlap létrehozása
         li.innerHTML = `
           <form class="edit-note-form">
             <input type="text" class="edit-note-input" value="${originalContent}" required>
@@ -863,12 +489,10 @@ function editNote(noteId) {
           </form>
         `;
 
-        // Űrlap események kezelése
         const form = li.querySelector('.edit-note-form');
         const input = li.querySelector('.edit-note-input');
         const cancelButton = li.querySelector('.cancel-edit');
 
-        // Mentés gomb eseménykezelő
         form.addEventListener('submit', (e) => {
           e.preventDefault();
           const newContent = input.value.trim();
@@ -878,24 +502,47 @@ function editNote(noteId) {
               content: newContent,
               timestamp: firebase.firestore.FieldValue.serverTimestamp()
             })
-            .then(() => {
-              loadNotes(); // Lista újratöltése
-            })
             .catch(error => {
               console.error('Hiba a jegyzet szerkesztésekor:', error);
               alert('Hiba történt a jegyzet mentésekor.');
             });
           } else {
-            loadNotes(); // Ha nem változott, csak újratöltjük
+            // Visszaállítjuk az eredeti megjelenítést
+            const note = doc.data();
+            li.innerHTML = `
+              <div class="note-content">
+                <strong>Tartalom:</strong> ${note.content}<br>
+                <small>Létrehozta: ${note.userId || 'ismeretlen'}</small>
+                <div class="note-date">
+                  ${note.timestamp ? note.timestamp.toDate().toLocaleString('hu-HU') : 'Dátum nélkül'}
+                </div>
+              </div>
+              <div class="note-actions">
+                <button onclick="editNote('${doc.id}')" class="edit-btn">Szerkesztés</button>
+                <button onclick="deleteNote('${doc.id}')" class="delete-btn">Törlés</button>
+              </div>
+            `;
           }
         });
 
-        // Mégse gomb eseménykezelő
         cancelButton.addEventListener('click', () => {
-          loadNotes(); // Visszatöltjük az eredeti listát
+          // Visszaállítjuk az eredeti megjelenítést
+          const note = doc.data();
+          li.innerHTML = `
+            <div class="note-content">
+              <strong>Tartalom:</strong> ${note.content}<br>
+              <small>Létrehozta: ${note.userId || 'ismeretlen'}</small>
+              <div class="note-date">
+                ${note.timestamp ? note.timestamp.toDate().toLocaleString('hu-HU') : 'Dátum nélkül'}
+              </div>
+            </div>
+            <div class="note-actions">
+              <button onclick="editNote('${doc.id}')" class="edit-btn">Szerkesztés</button>
+              <button onclick="deleteNote('${doc.id}')" class="delete-btn">Törlés</button>
+            </div>
+          `;
         });
 
-        // Input mezőre fókuszálás és a kurzor a szöveg végére
         input.focus();
         input.setSelectionRange(input.value.length, input.value.length);
       }
@@ -910,16 +557,13 @@ function editNote(noteId) {
 function deleteNote(noteId) {
   if (confirm('Biztosan törlöd ezt a jegyzetet?')) {
     db.collection('notes').doc(noteId).delete()
-    .then(() => {
-      loadNotes();
-    })
-    .catch(error => {
-      console.error('Hiba a jegyzet törlésekor:', error);
-    });
+      .catch(error => {
+        console.error('Hiba a jegyzet törlésekor:', error);
+      });
   }
 }
 
-// Időpontok betöltése
+// Időpontok oldal betöltése
 function loadAppointments() {
   const contentElement = document.getElementById('content');
   contentElement.innerHTML = `
@@ -932,60 +576,130 @@ function loadAppointments() {
     </form>
     <ul id="appointments-list"></ul>
   `;
+  
   document.getElementById('new-appointment-form').addEventListener('submit', addAppointment);
   
   const appointmentsList = document.getElementById('appointments-list');
-  const now = new Date();
   
-  db.collection('appointments')
-    .where('userId', '==', auth.currentUser.uid)
-    .orderBy('date', 'asc')
-    .get()
-    .then(snapshot => {
-      appointmentsList.innerHTML = '';
-      snapshot.forEach(doc => {
-        const appointment = doc.data();
-        const li = document.createElement('li');
-        
-        // Dátum biztonságos kezelése
-        let dateString = 'Érvénytelen dátum';
-        try {
-          if (appointment.date) {
-            const date = appointment.date.toDate();
-            dateString = date.toLocaleString('hu-HU', {
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit'
-            });
-          }
-        } catch (error) {
-          console.error('Hiba a dátum feldolgozásakor:', error);
-        }
+  // Korábbi listener eltávolítása ha létezik
+  if (window.mainAppointmentsUnsubscribe) {
+    window.mainAppointmentsUnsubscribe();
+  }
 
-        li.innerHTML = `
-          <div class="appointment-content">
-            <strong>${appointment.title}</strong> - ${dateString}
+  // Valós idejű query létrehozása
+  const query = db.collection('appointments')
+    .where('date', '>=', new Date())
+    .orderBy('date', 'asc');
+
+  // Valós idejű listener beállítása
+  window.mainAppointmentsUnsubscribe = query.onSnapshot((snapshot) => {
+    console.log("Időpontok változás észlelve, darabszám:", snapshot.size);
+    
+    appointmentsList.innerHTML = '';
+    
+    if (snapshot.empty) {
+      appointmentsList.innerHTML = '<li class="empty-message">Nincsenek időpontok</li>';
+      return;
+    }
+
+    snapshot.forEach(doc => {
+      const appointment = doc.data();
+      const li = document.createElement('li');
+      li.setAttribute('data-appointment-id', doc.id);
+      
+      let dateString = 'Érvénytelen dátum';
+      try {
+        if (appointment.date) {
+          const date = appointment.date.toDate();
+          dateString = date.toLocaleString('hu-HU', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          });
+        }
+      } catch (error) {
+        console.error('Hiba a dátum feldolgozásakor:', error);
+      }
+
+      li.innerHTML = `
+        <div class="appointment-content">
+          <div class="appointment-title">
+            <strong>${appointment.title}</strong>
           </div>
-          <div class="appointment-actions">
-            <button onclick="editAppointment('${doc.id}')">Szerkesztés</button>
-            <button onclick="deleteAppointment('${doc.id}')">Törlés</button>
+          <div class="appointment-details">
+            <div class="appointment-date">${dateString}</div>
+            <small>Létrehozta: ${appointment.userId || 'ismeretlen'}</small>
           </div>
-        `;
-        appointmentsList.appendChild(li);
-      });
-    })
-    .catch(error => {
-      console.error('Hiba az időpontok betöltésekor:', error);
-      appointmentsList.innerHTML = '<li class="error">Hiba történt az időpontok betöltésekor.</li>';
+        </div>
+        <div class="appointment-actions">
+          <button onclick="editAppointment('${doc.id}')" class="edit-btn">Szerkesztés</button>
+          <button onclick="deleteAppointment('${doc.id}')" class="delete-btn">Törlés</button>
+        </div>
+      `;
+      appointmentsList.appendChild(li);
     });
+  }, (error) => {
+    console.error('Hiba az időpontok valós idejű követésekor:', error);
+    appointmentsList.innerHTML = '<li class="error-message">Hiba történt az időpontok betöltésekor</li>';
+  });
+}
+
+// Cleanup függvény a modulváltáshoz
+function cleanupModules() {
+  // Jegyzetek listener-ek eltávolítása
+  if (window.notesUnsubscribe) {
+    window.notesUnsubscribe();
+  }
+  if (window.mainNotesUnsubscribe) {
+    window.mainNotesUnsubscribe();
+  }
+  
+  // Időpontok listener-ek eltávolítása
+  if (window.appointmentsUnsubscribe) {
+    window.appointmentsUnsubscribe();
+  }
+  if (window.mainAppointmentsUnsubscribe) {
+    window.mainAppointmentsUnsubscribe();
+  }
+}
+
+// Módosított showModule függvény a cleanup-pal
+function showModule(moduleId) {
+  console.log("Modul megjelenítése:", moduleId);
+  
+  // Előző modul cleanup
+  cleanupModules();
+  
+  const contentElement = document.getElementById('content');
+  contentElement.innerHTML = '';
+
+  switch(moduleId) {
+    case 'dashboard':
+      loadDashboard();
+      break;
+    case 'notes':
+      loadNotes();
+      break;
+    case 'appointments':
+      loadAppointments();
+      break;
+    case 'settings':
+      loadSettings();
+      break;
+    case 'profile':
+      loadProfile();
+      break;
+    default:
+      contentElement.innerHTML = `<h2>${moduleId.charAt(0).toUpperCase() + moduleId.slice(1)}</h2>
+                                <p>Ez a ${moduleId} modul tartalma.</p>`;
+  }
 }
 
 // Új időpont hozzáadása
 function addAppointment(e) {
   e.preventDefault();
-  console.log('Időpont hozzáadás kezdeményezve');
   
   const title = document.getElementById('appointment-title').value;
   const date = document.getElementById('appointment-date').value;
@@ -1008,23 +722,14 @@ function addAppointment(e) {
         status: 'pending',
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       })
-      .then((docRef) => {
+      .then(() => {
         console.log('Időpont sikeresen hozzáadva');
-      
-        // Azonnali értesítés az időpont létrehozásáról
-        showLocalNotification(
-          'Új időpont létrehozva',
-          `${title} időpont létrehozva: ${dateTime.toLocaleString('hu-HU')}`,
-          docRef.id  // Az új időpont ID-ja
-        );
         
         // Form tisztítása
         document.getElementById('appointment-title').value = '';
         document.getElementById('appointment-date').value = '';
         document.getElementById('appointment-time').value = '';
-        
-        // Lista újratöltése
-        loadAppointments();
+        // A loadAppointments() hívás eltávolítva, mert a listener kezeli
       })
       .catch(error => {
         console.error('Hiba az időpont mentésekor:', error);
@@ -1077,12 +782,7 @@ function editAppointment(appointmentId) {
           })
           .then(() => {
             console.log('Időpont sikeresen frissítve');
-            showLocalNotification(
-              'Időpont módosítva',
-              `${newTitle} - ${newDateTime.toLocaleString('hu-HU')}`,
-              appointmentId  // A módosított időpont ID-ja
-            );
-            loadAppointments();
+            // A loadAppointments() hívás eltávolítva, mert a listener kezeli
           })
           .catch(error => {
             console.error('Hiba az időpont frissítésekor:', error);
@@ -1104,16 +804,13 @@ function editAppointment(appointmentId) {
 function deleteAppointment(appointmentId) {
   if (confirm('Biztosan törölni szeretnéd ezt az időpontot?')) {
     db.collection('appointments').doc(appointmentId).delete()
-    .then(() => {
-      loadAppointments();
-    })
-    .catch(error => {
-      console.error('Hiba az időpont törlésekor:', error);
-    });
+      .catch(error => {
+        console.error('Hiba az időpont törlésekor:', error);
+      });
   }
 }
 
-// Beállítások betöltése
+// Beállítások oldal betöltése
 function loadSettings() {
   const contentElement = document.getElementById('content');
   contentElement.innerHTML = `
@@ -1126,25 +823,6 @@ function loadSettings() {
           <option value="dark">Sötét</option>
         </select>
       </div>
-      
-      <div class="settings-group">
-        <label for="notification-time">Értesítés küldése az időpont előtt:</label>
-        <select id="notification-time">
-          <option value="15">15 perc</option>
-          <option value="30">30 perc</option>
-          <option value="60">1 óra</option>
-        </select>
-      </div>
-      
-      <div class="settings-group">
-        <label for="notification-count">Értesítések száma:</label>
-        <select id="notification-count">
-          <option value="1">1 értesítés</option>
-          <option value="2">2 értesítés</option>
-          <option value="3">3 értesítés</option>
-        </select>
-      </div>
-      
       <button type="submit">Mentés</button>
     </form>
   `;
@@ -1153,25 +831,16 @@ function loadSettings() {
   
   // Jelenlegi beállítások betöltése
   const currentTheme = localStorage.getItem('theme') || 'light';
-  const notificationTime = localStorage.getItem('notificationTime') || '30';
-  const notificationCount = localStorage.getItem('notificationCount') || '1';
-  
   document.getElementById('theme-select').value = currentTheme;
-  document.getElementById('notification-time').value = notificationTime;
-  document.getElementById('notification-count').value = notificationCount;
 }
 
 // Beállítások mentése
 function saveSettings(e) {
   e.preventDefault();
   const theme = document.getElementById('theme-select').value;
-  const notificationTime = document.getElementById('notification-time').value;
-  const notificationCount = document.getElementById('notification-count').value;
   
   // Beállítások mentése
   localStorage.setItem('theme', theme);
-  localStorage.setItem('notificationTime', notificationTime);
-  localStorage.setItem('notificationCount', notificationCount);
   
   // Téma alkalmazása
   applyTheme(theme);
@@ -1179,7 +848,7 @@ function saveSettings(e) {
   alert('Beállítások sikeresen mentve!');
 }
 
-// Profil betöltése
+// Profil oldal betöltése
 function loadProfile() {
   const contentElement = document.getElementById('content');
   contentElement.innerHTML = `
@@ -1196,43 +865,11 @@ function loadProfile() {
           <input type="email" id="email" disabled>
         </div>
 
-        <div class="form-group">
-          <label>Értesítési beállítások</label>
-          <div class="checkbox-group">
-            <label>
-              <input type="checkbox" id="email-notifications">
-              Email értesítések
-            </label>
-            <label>
-              <input type="checkbox" id="push-notifications">
-              Push értesítések
-            </label>
-          </div>
-        </div>
-
         <div class="button-group">
           <button type="submit" class="primary-button">Mentés</button>
           <button type="button" onclick="changePassword()" class="secondary-button">Jelszó módosítása</button>
         </div>
       </form>
-
-      <div class="profile-section">
-        <h3>Fiók információk</h3>
-        <div class="info-grid">
-          <div class="info-item">
-            <span>Regisztráció dátuma</span>
-            <span id="registration-date">-</span>
-          </div>
-          <div class="info-item">
-            <span>Jegyzetek száma</span>
-            <span id="notes-count">-</span>
-          </div>
-          <div class="info-item">
-            <span>Időpontok száma</span>
-            <span id="appointments-count">-</span>
-          </div>
-        </div>
-      </div>
     </div>
   `;
 
@@ -1241,55 +878,12 @@ function loadProfile() {
 }
 
 // Profil adatok betöltése
-async function loadProfileData() {
-  try {
-    const user = auth.currentUser;
-    if (!user) return;
+function loadProfileData() {
+  const user = auth.currentUser;
+  if (!user) return;
 
-    // Alapadatok betöltése
-    document.getElementById('email').value = user.email;
-    document.getElementById('display-name').value = user.displayName || '';
-    
-    // Avatar betöltése/generálása
-    const avatarPreview = document.getElementById('avatar-preview');
-    if (user.photoURL) {
-      avatarPreview.style.backgroundImage = `url(${user.photoURL})`;
-      avatarPreview.innerHTML = '';
-    } else {
-      // Kezdőbetű megjelenítése
-      const initial = (user.displayName || user.email[0]).charAt(0).toUpperCase();
-      avatarPreview.innerHTML = initial;
-    }
-
-    // Felhasználói adatok lekérése Firestore-ból
-    const userDoc = await db.collection('users').doc(user.uid).get();
-    if (userDoc.exists) {
-      const userData = userDoc.data();
-      document.getElementById('phone').value = userData.phone || '';
-      document.getElementById('email-notifications').checked = userData.emailNotifications || false;
-      document.getElementById('push-notifications').checked = userData.pushNotifications || false;
-      
-      // Regisztráció dátuma
-      const regDate = user.metadata.creationTime;
-      document.getElementById('registration-date').textContent = 
-        new Date(regDate).toLocaleDateString('hu-HU');
-    }
-
-    // Statisztikák betöltése
-    const notesSnapshot = await db.collection('notes')
-      .where('userId', '==', user.uid)
-      .get();
-    document.getElementById('notes-count').textContent = notesSnapshot.size;
-
-    const appointmentsSnapshot = await db.collection('appointments')
-      .where('userId', '==', user.uid)
-      .get();
-    document.getElementById('appointments-count').textContent = appointmentsSnapshot.size;
-
-  } catch (error) {
-    console.error('Hiba a profil betöltésekor:', error);
-    alert('Hiba történt a profil adatok betöltésekor.');
-  }
+  document.getElementById('email').value = user.email;
+  document.getElementById('display-name').value = user.displayName || '';
 }
 
 // Profil mentése
@@ -1299,51 +893,15 @@ async function saveProfile(e) {
   if (!user) return;
 
   try {
-    // Felhasználónév frissítése
     const newDisplayName = document.getElementById('display-name').value;
     await user.updateProfile({
       displayName: newDisplayName
     });
 
-    // Felhasználói adatok mentése Firestore-ba
-    await db.collection('users').doc(user.uid).set({
-      phone: document.getElementById('phone').value,
-      emailNotifications: document.getElementById('email-notifications').checked,
-      pushNotifications: document.getElementById('push-notifications').checked,
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    }, { merge: true });
-
     alert('Profil sikeresen mentve!');
   } catch (error) {
     console.error('Hiba a profil mentésekor:', error);
     alert('Hiba történt a profil mentésekor.');
-  }
-}
-
-// Avatar feltöltés kezelése
-async function handleAvatarUpload(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-
-  try {
-    const user = auth.currentUser;
-    if (!user) return;
-
-    // Avatar előnézet frissítése
-    const reader = new FileReader();
-    reader.onload = function(e) {
-      const avatarPreview = document.getElementById('avatar-preview');
-      avatarPreview.style.backgroundImage = `url(${e.target.result})`;
-      avatarPreview.innerHTML = '';
-    };
-    reader.readAsDataURL(file);
-
-    // TODO: Ide jöhet a fájl feltöltése Firebase Storage-ba
-    alert('A profilkép feltöltés funkció még fejlesztés alatt áll.');
-
-  } catch (error) {
-    console.error('Hiba a profilkép feltöltésekor:', error);
-    alert('Hiba történt a profilkép feltöltésekor.');
   }
 }
 
@@ -1405,57 +963,12 @@ function login(e) {
 function logout() {
   auth.signOut().then(() => {
     console.log('Kijelentkezés sikeres');
-    // Menüsor elrejtése
     document.querySelector('nav').style.display = 'none';
     showLoginForm();
   }).catch((error) => {
     console.error('Hiba a kijelentkezésnél:', error);
   });
 }
-
-// PWA Install kezelés
-let deferredPrompt;
-
-window.addEventListener('beforeinstallprompt', (e) => {
-    // Prevent Chrome 67 and earlier from automatically showing the prompt
-    e.preventDefault();
-    
-    // Stash the event so it can be triggered later.
-    deferredPrompt = e;
-    
-    // Update UI to notify the user they can add to home screen
-    const installButton = document.getElementById('installButton');
-    if (installButton) {
-        installButton.style.display = 'flex';
-        
-        installButton.addEventListener('click', async () => {
-            // Hide our user interface that shows our A2HS button
-            installButton.style.display = 'none';
-            
-            // Show the prompt
-            deferredPrompt.prompt();
-            
-            // Wait for the user to respond to the prompt
-            const { outcome } = await deferredPrompt.userChoice;
-            console.log(`User response to the install prompt: ${outcome}`);
-            
-            // We've used the prompt, and can't use it again, discard it
-            deferredPrompt = null;
-        });
-    }
-});
-
-// Ha az app már telepítve van
-window.addEventListener('appinstalled', (evt) => {
-    console.log('Az alkalmazás telepítve lett.');
-    // Hide the app-provided install promotion
-    const installButton = document.getElementById('installButton');
-    if (installButton) {
-        installButton.style.display = 'none';
-    }
-    // Clear the deferredPrompt so it can be garbage collected
-    deferredPrompt = null;
-});
 
 // Eseményfigyelők hozzáadása
 document.addEventListener('DOMContentLoaded', () => {
@@ -1480,25 +993,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Értesítések inicializálása
-  initializeNotifications();
-
   // Téma betöltése és alkalmazása
   const savedTheme = localStorage.getItem('theme') || 'light';
   applyTheme(savedTheme);
-
-  // Service worker regisztráció
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', function() {
-      navigator.serviceWorker.register('/service-worker.js')
-        .then(function(registration) {
-          console.log('Service Worker regisztrálva:', registration);
-        })
-        .catch(function(error) {
-          console.error('Service Worker regisztrációs hiba:', error);
-        });
-    });
-  }
 });
 
-console.log("app.js betöltve és feldolgozva - v1.2 - force cache clear " + new Date().toISOString());
+console.log("app.js betöltve és feldolgozva " + new Date().toISOString());
