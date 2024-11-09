@@ -563,3 +563,47 @@ body.dark .user-info p {
     background-color: rgba(255, 255, 255, 0.1);
     border-radius: 4px;
 }
+
+/* Jegyzet animációk */
+@keyframes noteAdded {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes noteModified {
+  0% {
+    background-color: rgba(255, 255, 0, 0.2);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+@keyframes noteRemoved {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+}
+
+.note-added {
+  animation: noteAdded 0.5s ease-out;
+}
+
+.note-modified {
+  animation: noteModified 1s ease-out;
+}
+
+.note-removed {
+  animation: noteRemoved 0.5s ease-out;
+}

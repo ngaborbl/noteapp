@@ -612,39 +612,92 @@ function filterDashboardItems(searchTerm) {
   }
 }
 
+// Jegyzetek valós idejű betöltése és frissítése
 function loadRecentNotes(sortOrder = 'newest') {
+  console.log("Valós idejű jegyzet figyelés inicializálása...");
   const notesList = document.getElementById('recent-notes-list');
+  
+  if (!notesList) {
+    console.error('Jegyzetek lista elem nem található');
+    return;
+  }
+
+  // Korábbi listener eltávolítása ha létezik
+  if (window.notesUnsubscribe) {
+    window.notesUnsubscribe();
+  }
+
+  // Query létrehozása
   const query = db.collection('notes')
-    .where('userId', '==', auth.currentUser.uid)
     .orderBy('timestamp', sortOrder === 'newest' ? 'desc' : 'asc')
     .limit(5);
 
-  query.get()
-    .then(snapshot => {
-      notesList.innerHTML = '';
-      if (snapshot.empty) {
-        notesList.innerHTML = '<li class="empty-message">Nincsenek jegyzetek</li>';
-        return;
-      }
+  // Valós idejű listener beállítása
+  window.notesUnsubscribe = query.onSnapshot((snapshot) => {
+    console.log("Jegyzetek változás észlelve, darabszám:", snapshot.size);
+    
+    // Lista törlése frissítés előtt
+    notesList.innerHTML = '';
+    
+    // Ha nincs jegyzet
+    if (snapshot.empty) {
+      notesList.innerHTML = '<li class="empty-message">Nincsenek jegyzetek</li>';
+      return;
+    }
+
+    // Változások kezelése
+    snapshot.docChanges().forEach((change) => {
+      const note = change.doc.data();
+      const li = document.createElement('li');
+      li.setAttribute('data-note-id', change.doc.id);
       
-      snapshot.forEach(doc => {
-        const note = doc.data();
-        const li = document.createElement('li');
-        li.innerHTML = `
-          <div class="note-content">
-            ${note.content}
-          </div>
+      // Jegyzet HTML létrehozása
+      li.innerHTML = `
+        <div class="note-content">
+          ${note.content}
+        </div>
+        <div class="note-info">
+          <small>Létrehozta: ${note.userId || 'ismeretlen'}</small>
           <div class="note-date">
             ${note.timestamp ? note.timestamp.toDate().toLocaleString('hu-HU') : 'Dátum nélkül'}
           </div>
-        `;
-        notesList.appendChild(li);
-      });
-    })
-    .catch(error => {
-      console.error('Hiba a jegyzetek betöltésekor:', error);
-      notesList.innerHTML = '<li class="error-message">Hiba történt a jegyzetek betöltésekor</li>';
+        </div>
+      `;
+
+      // Animáció hozzáadása a változás típusa alapján
+      if (change.type === 'added') {
+        li.classList.add('note-added');
+      } else if (change.type === 'modified') {
+        li.classList.add('note-modified');
+      } else if (change.type === 'removed') {
+        li.classList.add('note-removed');
+      }
+
+      // Lista elem hozzáadása/frissítése
+      if (change.type === 'added' || change.type === 'modified') {
+        // Ha új vagy módosított jegyzet, beszúrjuk a megfelelő helyre
+        if (sortOrder === 'newest') {
+          notesList.insertBefore(li, notesList.firstChild);
+        } else {
+          notesList.appendChild(li);
+        }
+      } else if (change.type === 'removed') {
+        // Ha törölt jegyzet, megkeressük és eltávolítjuk
+        const existingNote = notesList.querySelector(`[data-note-id="${change.doc.id}"]`);
+        if (existingNote) {
+          existingNote.remove();
+        }
+      }
     });
+
+    // Ha üres a lista a változások után
+    if (notesList.children.length === 0) {
+      notesList.innerHTML = '<li class="empty-message">Nincsenek jegyzetek</li>';
+    }
+  }, (error) => {
+    console.error('Hiba a jegyzetek valós idejű követésekor:', error);
+    notesList.innerHTML = '<li class="error-message">Hiba történt a jegyzetek betöltésekor</li>';
+  });
 }
 
 function loadUpcomingAppointments(range = 'week') {
