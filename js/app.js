@@ -712,7 +712,7 @@ function loadNotes() {
   
   const notesList = document.getElementById('notes-list');
   db.collection('notes')
-    .where('userId', '==', auth.currentUser.uid)
+    // Itt töröljük a where feltételt
     .orderBy('timestamp', 'desc')
     .get()
     .then(snapshot => {
@@ -720,8 +720,8 @@ function loadNotes() {
       snapshot.forEach(doc => {
         const note = doc.data();
         const li = document.createElement('li');
-        li.setAttribute('data-note-id', doc.id); // Azonosító hozzáadása
-        li.id = doc.id; // ID hozzáadása a könnyebb lekéréshez
+        li.setAttribute('data-note-id', doc.id);
+        li.id = doc.id;
         li.innerHTML = `
           <span class="note-content">${note.content}</span>
           <div class="note-actions">
