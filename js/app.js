@@ -28,11 +28,14 @@ function setDebugMode(enabled) {
 
 // Debug üzenetek naplózása
 function logDebug(message, data = null) {
-  if (logConfig.isDebugMode) {
+  // Egyszerű debug mód ellenőrzés
+  const isDebugMode = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  
+  if (isDebugMode) {
     if (data) {
-      console.debug(`[Debug] ${message}:`, data);
+      console.log(`[Debug] ${message}:`, data);
     } else {
-      console.debug(`[Debug] ${message}`);
+      console.log(`[Debug] ${message}`);
     }
   }
 }
