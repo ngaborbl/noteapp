@@ -1294,6 +1294,8 @@ document.addEventListener('DOMContentLoaded', () => {
   logDebug("Alkalmazás inicializálása befejezve", { 
     theme: savedTheme 
   });
-});
+}
 
 logInfo("app.js betöltve és feldolgozva", { timestamp: new Date().toISOString() });
+
+//Version 1.85
