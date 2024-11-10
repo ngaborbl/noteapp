@@ -583,12 +583,11 @@ function loadAppointments() {
     window.mainAppointmentsUnsubscribe();
   }
 
-  // Valós idejű query létrehozása - eltávolítva a userId szűrés
+  // Valós idejű query létrehozása - NINCS userId szűrés
   const query = db.collection('appointments')
     .where('date', '>=', new Date())
     .orderBy('date', 'asc');
 
-  // Valós idejű listener beállítása
   window.mainAppointmentsUnsubscribe = query.onSnapshot(snapshot => {
     console.log("Időpontok változás észlelve, darabszám:", snapshot.size);
     
@@ -598,7 +597,6 @@ function loadAppointments() {
       appointmentsList.innerHTML = '<li class="empty-message">Nincsenek időpontok</li>';
       return;
     }
-
 
     snapshot.forEach(doc => {
       const appointment = doc.data();
@@ -678,18 +676,15 @@ function loadDashboardStats() {
   // Listener-ek tárolása
   window.statsUnsubscribe = [];
 
-  // Jegyzetek számának valós idejű követése
+  // Jegyzetek számának valós idejű követése - nincs szűrés
   const notesQuery = db.collection('notes');
   window.statsUnsubscribe.push(
     notesQuery.onSnapshot(snapshot => {
       document.getElementById('notes-count').textContent = snapshot.size + ' db';
-    }, error => {
-      console.error('Hiba a jegyzetek számának lekérésekor:', error);
-      document.getElementById('notes-count').textContent = 'Hiba történt';
     })
   );
 
-  // Mai időpontok számának valós idejű követése
+  // Mai időpontok számának valós idejű követése - nincs userId szűrés
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const tomorrow = new Date(today);
@@ -702,13 +697,10 @@ function loadDashboardStats() {
   window.statsUnsubscribe.push(
     todayAppointmentsQuery.onSnapshot(snapshot => {
       document.getElementById('today-appointments').textContent = snapshot.size + ' db';
-    }, error => {
-      console.error('Hiba a mai időpontok lekérésekor:', error);
-      document.getElementById('today-appointments').textContent = 'Hiba történt';
     })
   );
 
-  // Következő időpont valós idejű követése
+  // Következő időpont - nincs userId szűrés
   const nextAppointmentQuery = db.collection('appointments')
     .where('date', '>=', new Date())
     .orderBy('date', 'asc')
@@ -723,9 +715,6 @@ function loadDashboardStats() {
       } else {
         document.getElementById('next-appointment').textContent = 'Nincs közelgő időpont';
       }
-    }, error => {
-      console.error('Hiba a következő időpont lekérésekor:', error);
-      document.getElementById('next-appointment').textContent = 'Hiba történt';
     })
   );
 }
