@@ -1307,4 +1307,4 @@ document.addEventListener('DOMContentLoaded', () => {
 
 logInfo("app.js betöltve és feldolgozva", { timestamp: new Date().toISOString() });
 
-//Version 1.86
+//Version 1.87
