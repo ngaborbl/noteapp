@@ -90,25 +90,30 @@ db.enablePersistence()
     }
   });
 
-// Realtime frissítések beállítása
-db.settings({
-  cacheSizeBytes: firebase.firestore.CACHE_SIZE_UNLIMITED
-});
-
 // Alkalmazás inicializálása
 function initApp() {
   logDebug("Alkalmazás inicializálása...");
   const navElement = document.querySelector('nav');
-  navElement.style.display = 'none';
+  if (navElement) {
+    navElement.style.display = 'none';
+  }
   
+  // Először mutatjuk a login formot
+  showLoginForm();
+  
+  // Majd figyeljük a bejelentkezési státuszt
   auth.onAuthStateChanged((user) => {
     if (user) {
       logInfo("Felhasználó bejelentkezve", { email: user.email });
-      navElement.style.display = 'flex';
+      if (navElement) {
+        navElement.style.display = 'flex';
+      }
       showModule('dashboard');
     } else {
       logInfo("Nincs bejelentkezett felhasználó");
-      navElement.style.display = 'none';
+      if (navElement) {
+        navElement.style.display = 'none';
+      }
       showLoginForm();
     }
   });
@@ -1205,17 +1210,21 @@ function showLoginForm() {
   }
   
   contentElement.innerHTML = `
-    <h2>Bejelentkezés</h2>
-    <form id="login-form">
-      <input type="email" id="login-email" placeholder="Email cím" required>
-      <input type="password" id="login-password" placeholder="Jelszó" required>
-      <button type="submit">Bejelentkezés</button>
-    </form>
+    <div class="login-container">
+      <h2>NoteApp bejelentkezés</h2>
+      <form id="login-form" class="login-form">
+        <div class="form-group">
+          <label for="login-email">Email cím</label>
+          <input type="email" id="login-email" placeholder="Email cím" required>
+        </div>
+        <div class="form-group">
+          <label for="login-password">Jelszó</label>
+          <input type="password" id="login-password" placeholder="Jelszó" required>
+        </div>
+        <button type="submit" class="login-button">Bejelentkezés</button>
+      </form>
+    </div>
   `;
-  document.getElementById('login-form').addEventListener('submit', login);
-  
-  logDebug("Bejelentkező űrlap megjelenítve");
-}
 
 // Bejelentkezés
 function login(e) {
