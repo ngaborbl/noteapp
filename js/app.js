@@ -1226,6 +1226,15 @@ function showLoginForm() {
     </div>
   `;
 
+  // Login form eseménykezelő
+  const form = document.getElementById('login-form');
+  if (form) {
+    form.addEventListener('submit', login);
+  }
+  
+  logDebug("Bejelentkező űrlap megjelenítve");
+}
+
 // Bejelentkezés
 function login(e) {
   e.preventDefault();
