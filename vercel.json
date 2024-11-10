@@ -3,21 +3,16 @@
   "public": true,
   "builds": [
     {
-      "src": ".",
+      "src": "*.html",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "*.js",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "*.css",
       "use": "@vercel/static"
     }
-  ],
-  "routes": [
-    {
-      "src": "/(.*)",
-      "headers": {
-        "cache-control": "s-maxage=1, stale-while-revalidate"
-      },
-      "dest": "/$1"
-    }
-  ],
-  "github": {
-    "enabled": true,
-    "silent": true
-  }
+  ]
 }
