@@ -1303,8 +1303,9 @@ document.addEventListener('DOMContentLoaded', () => {
   logDebug("Alkalmazás inicializálása befejezve", { 
     theme: savedTheme 
   });
-}
+}); // Ez a záró kapocs hiányzott
 
+// Ez a logInfo hívás a DOMContentLoaded eseménykezelőn kívül marad
 logInfo("app.js betöltve és feldolgozva", { timestamp: new Date().toISOString() });
 
 //Version 1.87
