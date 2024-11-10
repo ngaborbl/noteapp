@@ -1,36 +1,66 @@
-Fájlstruktúra:
+NoteApp PWA
+Jelenlegi állapot
 
-Copynoteapp-pwa/
-├── css/
-│   └── style.css
-├── js/
-│   └── app.js
-├── fonts/
-│   └── BalooPaaji2-Regular.ttf
-├── icons/
-│   ├── dashboard.png
-│   ├── note.png
-│   ├── calendar.png
-│   ├── settings.png
-│   ├── profile.png
-│   ├── admin.png
-│   └── logout.png
-├── index.html
-├── manifest.json
-├── service-worker.js
-└── .vercel/
+PWA alkalmazás jegyzeteléshez és időpontkezeléshez
+Firebase backend (Authentication és Firestore)
+Service Worker alapú push értesítések
+Telepíthető verzió mobil és PC platformra
 
-Technológiák:
+Fő funkciók
+
+Felhasználókezelés:
+
+Bejelentkezés/Regisztráció
+Profil kezelés
+Több felhasználós rendszer
 
 
-Firebase (Authentication, Firestore)
-Vercel deployment
-PWA funkcionalitás
-Service Worker értesítésekhez
+Jegyzetek:
+
+Létrehozás, szerkesztés, törlés
+Minden felhasználó látja az összes jegyzetet
+Valós idejű szinkronizáció
 
 
-Konfigurációs adatok:
+Időpontkezelés:
 
+Időpontok létrehozása
+Automatikus értesítések
+Firebase Cloud Messaging (FCM) integráció
+
+
+PWA funkciók:
+
+Offline működés
+Telepíthető alkalmazás
+Push értesítések
+
+
+
+Technikai részletek
+
+Frontend:
+
+HTML5, CSS3, JavaScript
+PWA manifest
+Service Worker
+
+
+Backend:
+
+Firebase Authentication
+Firestore adatbázis
+Firebase Cloud Messaging
+
+
+Deployment:
+
+Vercel hosting
+Git alapú verziókezelés
+
+
+
+Aktuális config adatok:
 javascriptCopyconst firebaseConfig = {
   apiKey: "AIzaSyBsQMs29I_kwN5idgcyAdz0etWfv7ymyz8",
   authDomain: "noteapp-5c98e.firebaseapp.com",
@@ -40,55 +70,41 @@ javascriptCopyconst firebaseConfig = {
   appId: "1:10607490745:web:5cdff4c9c5e78d7c798d68",
   measurementId: "G-3NSSJ1FT7S"
 };
+Fájlstruktúra:
+Copynoteapp-pwa/
+├── css/
+│   └── style.css
+├── js/
+│   └── app.js
+├── icons/
+│   ├── icon-48.png
+│   ├── icon-144.png
+│   ├── icon-192.png
+│   └── icon-512.png
+├── index.html
+├── manifest.json
+├── service-worker.js
+└── .vercel/
+Következő fejlesztési lehetőségek:
 
-Vercel project adatok:
+Jegyzet és időpont szinkronizáció továbbfejlesztése
+Offline működés javítása
+Push értesítések finomhangolása
+UI/UX fejlesztések
+Kategóriák/címkék bevezetése
+Keresési funkció implementálása
 
+Jelenlegi problémák/fejlesztendő területek:
 
-Project ID: prj_OZS6CDf0s3aUU4lC3DZVeCwAwooF
-Org ID: team_FkQlLWJcyg6CpmuZypJXhSd2
+Valós idejű szinkronizáció finomhangolása
+Dashboard jegyzet megjelenítés optimalizálása
+Push értesítések mobilon való megjelenésének javítása
+Offline működés fejlesztése
 
+Fontos linkek:
 
-Főbb collection-ök a Firestore-ban:
+Éles verzió: https://noteapp-mu-nine.vercel.app/
+Firebase Console: https://console.firebase.google.com/project/noteapp-5c98e
+Vercel Dashboard: kapcsolódó projekt azonosítók
 
-
-notes
-appointments
-users
-
-
-A program jelenlegi állapota:
-
-Alapvető funkciók működnek:
-
-Bejelentkezés/Kijelentkezés
-Jegyzetek kezelése (létrehozás, szerkesztés, törlés)
-Időpontok kezelése (létrehozás, szerkesztés, törlés)
-Értesítési rendszer időpontokhoz
-Beállítások (téma, értesítések időzítése)
-Profil kezelés (név módosítása, jelszóváltoztatás)
-
-
-Felhasználói felület:
-
-Reszponzív design
-Világos/sötét téma támogatás
-Optimalizált dashboard elrendezés
-Felhasználóbarát üdvözlő panel
-
-
-Főbb módosítások az utolsó verzióban:
-
-Avatar eltávolítva
-Dashboard felirat eltávolítva
-Felhasználói név megjelenítés optimalizálva
-Mobilnézet javítva
-
-
-További fejlesztési lehetőségek:
-
-Jegyzetek kategorizálása
-Időpontok ismétlődése
-Részletesebb statisztikák
-Keresési funkció bővítése
-Csoportos műveletek
-Adatok exportálása
+Ez az állapot a 2024.11.09-i fejlesztési státuszt tükrözi.

@@ -584,6 +584,7 @@ function addNote(e) {
       content: newNoteContent,
       timestamp: firebase.firestore.FieldValue.serverTimestamp(),
       lastModified: firebase.firestore.FieldValue.serverTimestamp()
+      // userId eltávolítva
     };
     
     db.collection('notes').add(noteData)
@@ -919,6 +920,7 @@ function addAppointment(e) {
         date: firebase.firestore.Timestamp.fromDate(dateTime),
         timestamp: firebase.firestore.FieldValue.serverTimestamp(),
         lastModified: firebase.firestore.FieldValue.serverTimestamp()
+        // userId eltávolítva
       };
       
       db.collection('appointments').add(appointmentData)
