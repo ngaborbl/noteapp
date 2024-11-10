@@ -16,8 +16,10 @@ const auth = firebase.auth();
 
 // Naplózási konfiguráció
 const logConfig = {
-  isDebugMode: localStorage.getItem('debugMode') === 'true' || window.location.hostname === 'localhost',
-  maxDataLength: 1000 // Maximális adat hossz a naplózáshoz
+  isDebugMode: localStorage.getItem('debugMode') === 'true' || 
+               window.location.hostname === 'localhost' || 
+               window.location.hostname.includes('vercel.app'),
+  maxDataLength: 1000
 };
 
 // Debug mód beállítása
@@ -26,16 +28,13 @@ function setDebugMode(enabled) {
   localStorage.setItem('debugMode', enabled);
 }
 
-// Debug üzenetek naplózása
+// Módosított logDebug
 function logDebug(message, data = null) {
-  // Egyszerű debug mód ellenőrzés
-  const isDebugMode = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-  
-  if (isDebugMode) {
+  if (logConfig.isDebugMode) {
     if (data) {
-      console.log(`[Debug] ${message}:`, data);
+      console.debug(`[Debug] ${message}:`, data);
     } else {
-      console.log(`[Debug] ${message}`);
+      console.debug(`[Debug] ${message}`);
     }
   }
 }
@@ -841,17 +840,6 @@ function showModule(moduleId) {
     default:
       contentElement.innerHTML = `<h2>${moduleId.charAt(0).toUpperCase() + moduleId.slice(1)}</h2>
                                 <p>Ez a ${moduleId} modul tartalma.</p>`;
-  }
-}
-
-// Optimalizált naplózási funkció
-function logDebug(message, data = null) {
-  if (process.env.NODE_ENV === 'development') {
-    if (data) {
-      console.log(`[Debug] ${message}:`, data);
-    } else {
-      console.log(`[Debug] ${message}`);
-    }
   }
 }
 
