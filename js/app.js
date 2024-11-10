@@ -14,6 +14,27 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 const auth = firebase.auth();
 
+// Persistence beállítása
+db.enablePersistence()
+  .then(() => {
+    console.log("Offline persistence engedélyezve");
+  })
+  .catch((err) => {
+    console.error("Persistence hiba:", err);
+    if (err.code == 'failed-precondition') {
+      // Több tab van nyitva
+      console.log("Persistence nem elérhető - több tab nyitva");
+    } else if (err.code == 'unimplemented') {
+      // A böngésző nem támogatja
+      console.log("Persistence nem támogatott");
+    }
+  });
+
+// Realtime frissítések beállítása
+db.settings({
+  cacheSizeBytes: firebase.firestore.CACHE_SIZE_UNLIMITED
+});
+
 // Alkalmazás inicializálása
 function initApp() {
   console.log("Alkalmazás inicializálása...");
@@ -304,7 +325,6 @@ function loadUpcomingAppointments(range = 'week') {
           ${appointment.date.toDate().toLocaleString('hu-HU')}
         </div>
         <div class="appointment-creator">
-          Létrehozta: ${appointment.userId || 'ismeretlen'}
         </div>
       `;
       appointmentsList.appendChild(li);
@@ -317,6 +337,7 @@ function loadUpcomingAppointments(range = 'week') {
 
 // Legutóbbi jegyzetek betöltése
 function loadRecentNotes(sortOrder = 'newest') {
+  console.log("Platform:", navigator.userAgent); // Platform azonosítása
   console.log("Valós idejű jegyzet figyelés inicializálása...");
   const notesList = document.getElementById('recent-notes-list');
   
@@ -325,24 +346,21 @@ function loadRecentNotes(sortOrder = 'newest') {
     return;
   }
 
-  // Korábbi listener eltávolítása ha létezik
   if (window.notesUnsubscribe) {
+    console.log("Korábbi jegyzet listener eltávolítása");
     window.notesUnsubscribe();
   }
 
-  // Query létrehozása
   const query = db.collection('notes')
     .orderBy('timestamp', sortOrder === 'newest' ? 'desc' : 'asc')
     .limit(5);
 
-  // Valós idejű listener beállítása
   window.notesUnsubscribe = query.onSnapshot((snapshot) => {
+    console.log("Jegyzetek változás típusa:", snapshot.docChanges().map(change => change.type));
     console.log("Jegyzetek változás észlelve, darabszám:", snapshot.size);
     
-    // Lista törlése frissítés előtt
     notesList.innerHTML = '';
     
-    // Ha nincs jegyzet
     if (snapshot.empty) {
       notesList.innerHTML = '<li class="empty-message">Nincsenek jegyzetek</li>';
       return;
@@ -358,13 +376,17 @@ function loadRecentNotes(sortOrder = 'newest') {
         <div class="note-content">
           ${note.content}
         </div>
-        <div class="note-info">
-          <small>Létrehozta: ${note.userId || 'ismeretlen'}</small>
-          <div class="note-date">
-            ${note.timestamp ? note.timestamp.toDate().toLocaleString('hu-HU') : 'Dátum nélkül'}
-          </div>
+        <div class="note-date">
+          ${note.timestamp ? note.timestamp.toDate().toLocaleString('hu-HU') : 'Dátum nélkül'}
         </div>
       `;
+
+      if (sortOrder === 'newest') {
+        notesList.insertBefore(li, notesList.firstChild);
+      } else {
+        notesList.appendChild(li);
+      }
+    });
 
       // Lista elem hozzáadása/frissítése
       if (sortOrder === 'newest') {
@@ -373,10 +395,29 @@ function loadRecentNotes(sortOrder = 'newest') {
         notesList.appendChild(li);
       }
     });
+
+    // Extra debug információ
+    console.log("Jegyzetek betöltve:", {
+      sortOrder,
+      count: snapshot.size,
+      firstNote: snapshot.docs[0]?.data()?.content,
+      changes: snapshot.docChanges().length
+    });
+
   }, (error) => {
     console.error('Hiba a jegyzetek valós idejű követésekor:', error);
+    console.error('Hiba részletek:', error.code, error.message);
     notesList.innerHTML = '<li class="error-message">Hiba történt a jegyzetek betöltésekor</li>';
   });
+
+  // Explicit adatlekérés a cache megkerülésével
+  query.get({ source: 'server' })
+    .then(snapshot => {
+      console.log("Szerver oldali lekérés kész:", snapshot.size);
+    })
+    .catch(error => {
+      console.error("Szerver oldali lekérés hiba:", error);
+    });
 }
 
 // Jegyzetek oldal betöltése
@@ -425,7 +466,6 @@ function loadNotes() {
       li.innerHTML = `
         <div class="note-content">
           <strong>Tartalom:</strong> ${note.content}<br>
-          <small>Létrehozta: ${note.userId || 'ismeretlen'}</small>
           <div class="note-date">
             ${note.timestamp ? note.timestamp.toDate().toLocaleString('hu-HU') : 'Dátum nélkül'}
           </div>
@@ -453,7 +493,6 @@ function addNote(e) {
   if (newNoteContent) {
     const noteData = {
       content: newNoteContent,
-      userId: auth.currentUser.uid,
       timestamp: firebase.firestore.FieldValue.serverTimestamp()
     };
     
@@ -461,7 +500,6 @@ function addNote(e) {
       .then((docRef) => {
         console.log("Jegyzet sikeresen létrehozva, ID:", docRef.id);
         newNoteInput.value = '';
-        // A loadNotes() hívás eltávolítva, mert a listener kezeli
       })
       .catch(error => {
         console.error('Hiba a jegyzet hozzáadásakor:', error);
@@ -509,7 +547,6 @@ function editNote(noteId) {
             li.innerHTML = `
               <div class="note-content">
                 <strong>Tartalom:</strong> ${note.content}<br>
-                <small>Létrehozta: ${note.userId || 'ismeretlen'}</small>
                 <div class="note-date">
                   ${note.timestamp ? note.timestamp.toDate().toLocaleString('hu-HU') : 'Dátum nélkül'}
                 </div>
@@ -528,7 +565,6 @@ function editNote(noteId) {
           li.innerHTML = `
             <div class="note-content">
               <strong>Tartalom:</strong> ${note.content}<br>
-              <small>Létrehozta: ${note.userId || 'ismeretlen'}</small>
               <div class="note-date">
                 ${note.timestamp ? note.timestamp.toDate().toLocaleString('hu-HU') : 'Dátum nélkül'}
               </div>
@@ -626,7 +662,6 @@ function loadAppointments() {
           </div>
           <div class="appointment-details">
             <div class="appointment-date">${dateString}</div>
-            <small>Létrehozta: ${appointment.userId || 'ismeretlen'}</small>
           </div>
         </div>
         <div class="appointment-actions">
@@ -644,31 +679,103 @@ function loadAppointments() {
 
 // Cleanup függvény a modulváltáshoz
 function cleanupModules() {
+  console.log("Cleanup kezdése...");
+  
   // Jegyzetek listener-ek eltávolítása
   if (window.notesUnsubscribe) {
+    console.log("Jegyzetek listener eltávolítása");
     window.notesUnsubscribe();
     window.notesUnsubscribe = null;
   }
   if (window.mainNotesUnsubscribe) {
+    console.log("Fő jegyzetek listener eltávolítása");
     window.mainNotesUnsubscribe();
     window.mainNotesUnsubscribe = null;
   }
-  
-  // Időpontok listener-ek eltávolítása
   if (window.appointmentsUnsubscribe) {
+    console.log("Időpontok listener eltávolítása");
     window.appointmentsUnsubscribe();
     window.appointmentsUnsubscribe = null;
   }
   if (window.mainAppointmentsUnsubscribe) {
+    console.log("Fő időpontok listener eltávolítása");
     window.mainAppointmentsUnsubscribe();
     window.mainAppointmentsUnsubscribe = null;
   }
-
-  // Statisztika listener-ek eltávolítása
   if (window.statsUnsubscribe) {
-    window.statsUnsubscribe.forEach(unsubscribe => unsubscribe());
+    console.log("Statisztika listener-ek eltávolítása");
+    window.statsUnsubscribe.forEach(unsubscribe => {
+      try {
+        unsubscribe();
+      } catch (error) {
+        console.error("Hiba a statisztika listener eltávolításakor:", error);
+      }
+    });
     window.statsUnsubscribe = [];
   }
+
+  // Cache kezelés
+  try {
+    // Aktív lekérdezések törlése
+    db.terminate().then(() => {
+      console.log("Firestore kapcsolat lezárva");
+      
+      // Persistence törlése
+      return db.clearPersistence();
+    }).then(() => {
+      console.log("Cache törölve");
+      
+      // Firestore újrainicializálása
+      db.enablePersistence()
+        .then(() => {
+          console.log("Persistence újra engedélyezve");
+        })
+        .catch(err => {
+          console.warn("Persistence újraengedélyezési figyelmeztetés:", err);
+        });
+    }).catch(err => {
+      console.error("Cache törlési hiba:", err);
+    });
+  } catch (error) {
+    console.error("Cleanup hiba:", error);
+  }
+
+  console.log("Cleanup befejezve");
+}
+
+// Modul váltás módosítása a cleanup-pal
+function showModule(moduleId) {
+  console.log("Modul váltás:", moduleId);
+  
+  // Előző modul cleanup
+  cleanupModules();
+  
+  const contentElement = document.getElementById('content');
+  contentElement.innerHTML = '';
+
+  // Kis késleltetés a cleanup befejezéséhez
+  setTimeout(() => {
+    switch(moduleId) {
+      case 'dashboard':
+        loadDashboard();
+        break;
+      case 'notes':
+        loadNotes();
+        break;
+      case 'appointments':
+        loadAppointments();
+        break;
+      case 'settings':
+        loadSettings();
+        break;
+      case 'profile':
+        loadProfile();
+        break;
+      default:
+        contentElement.innerHTML = `<h2>${moduleId.charAt(0).toUpperCase() + moduleId.slice(1)}</h2>
+                                  <p>Ez a ${moduleId} modul tartalma.</p>`;
+    }
+  }, 100);  // 100ms késleltetés a cleanup-hoz
 }
 
 // Módosított loadDashboardStats eleje
@@ -740,9 +847,7 @@ function addAppointment(e) {
       db.collection('appointments').add({
         title: title,
         date: timestamp,
-        userId: auth.currentUser.uid,
-        status: 'pending',
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        timestamp: firebase.firestore.FieldValue.serverTimestamp()
       })
       .then(() => {
         console.log('Időpont sikeresen hozzáadva');
@@ -751,7 +856,6 @@ function addAppointment(e) {
         document.getElementById('appointment-title').value = '';
         document.getElementById('appointment-date').value = '';
         document.getElementById('appointment-time').value = '';
-        // A loadAppointments() hívás eltávolítva, mert a listener kezeli
       })
       .catch(error => {
         console.error('Hiba az időpont mentésekor:', error);
