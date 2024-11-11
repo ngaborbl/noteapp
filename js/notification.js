@@ -6,6 +6,7 @@ class NotificationManager {
     this.initialized = false;
     this.pendingNotifications = new Map();
     this.retryAttempts = 3;
+    this.vapidKey = "knDCQxYIDpfB9UONeHF2E_VIUup6XTH__TkBIIvz31w";
   }
 
   async initialize() {
