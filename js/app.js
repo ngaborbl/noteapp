@@ -1151,8 +1151,14 @@ export {
   setupDashboardEvents
 };
 
-// Verzió információ módosítása
+// Timestamp helper függvény
+function getTimestamp() {
+  const now = new Date();
+  return now.toISOString();
+}
+
+// Verzió információ
 logInfo("NoteApp v1.88 betöltve", { 
-  timestamp: new Date().toISOString(),
+  timestamp: getTimestamp(),
   environment: window.location.hostname === 'localhost' ? 'development' : 'production'
 });
