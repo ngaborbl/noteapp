@@ -1,40 +1,34 @@
-importScripts('https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/9.6.0/firebase-messaging-compat.js');
-
-firebase.initializeApp({
-  apiKey: "AIzaSyBsQMs29I_kwN5idgcyAdz0etWfv7ymyz8",
-  authDomain: "noteapp-5c98e.firebaseapp.com",
-  projectId: "noteapp-5c98e",
-  storageBucket: "noteapp-5c98e.appspot.com",
-  messagingSenderId: "10607490745",
-  appId: "1:10607490745:web:5cdff4c9c5e78d7c798d68"
-});
-
-const messaging = firebase.messaging();
+// service-worker.js
 
 const CACHE_NAME = 'noteapp-cache-v1';
 const urlsToCache = [
   '/',
   '/index.html',
   '/js/app.js',
+  '/js/notifications.js',
   '/css/style.css',
-  '/icons/calendar.png'
+  '/icons/icon-48.png',
+  '/icons/icon-144.png',
+  '/icons/icon-192.png',
+  '/icons/icon-512.png'
 ];
 
-self.addEventListener('install', function(event) {
+// Service Worker telepítése
+self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(function(cache) {
-        console.log('Opened cache');
+      .then((cache) => {
+        console.log('Cache megnyitva');
         return cache.addAll(urlsToCache);
       })
   );
 });
 
-self.addEventListener('fetch', function(event) {
+// Fetch események kezelése cache-eléssel
+self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.match(event.request)
-      .then(function(response) {
+      .then((response) => {
         if (response) {
           return response;
         }
@@ -43,16 +37,83 @@ self.addEventListener('fetch', function(event) {
   );
 });
 
-// FCM háttér üzenetek kezelése
-messaging.onBackgroundMessage(function(payload) {
-  console.log('[Service Worker] Háttér üzenet érkezett:', payload);
+// Push értesítések kezelése
+self.addEventListener('push', (event) => {
+  if (event.data) {
+    const data = event.data.json();
+    
+    const options = {
+      body: data.body || 'Új értesítés érkezett',
+      icon: '/icons/icon-192.png',
+      badge: '/icons/icon-48.png',
+      vibrate: [200, 100, 200],
+      tag: data.tag || 'noteapp-notification',
+      requireInteraction: true,
+      actions: [
+        {
+          action: 'open',
+          title: 'Megnyitás'
+        },
+        {
+          action: 'dismiss',
+          title: 'Bezárás'
+        }
+      ],
+      data: {
+        url: data.url || '/',
+        timestamp: Date.now(),
+        ...data.data
+      }
+    };
 
-  const notificationTitle = payload.notification.title;
-  const notificationOptions = {
-    body: payload.notification.body,
-    icon: '/icons/calendar.png',
-    badge: '/icons/calendar.png'
-  };
+    event.waitUntil(
+      self.registration.showNotification(data.title, options)
+    );
+  }
+});
 
-  return self.registration.showNotification(notificationTitle, notificationOptions);
+// Értesítésre kattintás kezelése
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  if (event.action === 'dismiss') {
+    return;
+  }
+
+  // Alkalmazás megnyitása a megfelelő oldalon
+  event.waitUntil(
+    clients.matchAll({
+      type: 'window',
+      includeUncontrolled: true
+    })
+    .then((clientList) => {
+      // Ha már nyitva van az alkalmazás
+      for (const client of clientList) {
+        if (client.url === event.notification.data.url && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      // Ha nincs nyitva, új ablakban nyitjuk meg
+      if (clients.openWindow) {
+        return clients.openWindow(event.notification.data.url);
+      }
+    })
+  );
+});
+
+// Service worker aktiválása
+self.addEventListener('activate', (event) => {
+  const cacheWhitelist = [CACHE_NAME];
+
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.map((cacheName) => {
+          if (cacheWhitelist.indexOf(cacheName) === -1) {
+            return caches.delete(cacheName);
+          }
+        })
+      );
+    })
+  );
 });
