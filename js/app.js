@@ -1159,6 +1159,6 @@ function getTimestamp() {
 
 // Verzió információ
 logInfo("NoteApp v1.88 betöltve", { 
-  timestamp: getTimestamp(),
-  environment: window.location.hostname === 'localhost' ? 'development' : 'production'
+  timestamp: new Date().toISOString(),
+  environment: self.location.hostname === 'localhost' ? 'development' : 'production'
 });

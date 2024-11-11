@@ -1,36 +1,32 @@
-// service-worker.js
-
 const CACHE_NAME = 'noteapp-cache-v1';
 const urlsToCache = [
   '/',
   '/index.html',
   '/js/app.js',
-  '/js/notifications.js',
   '/css/style.css',
   '/icons/icon-48.png',
   '/icons/icon-144.png',
   '/icons/icon-192.png',
   '/icons/icon-512.png'
+  // notifications.js eltávolítva a listából, mert module-ként töltődik be
 ];
 
-// Service Worker telepítése
+// Cache telepítés módosítása
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
         console.log('Cache megnyitva');
-        // Cache feltöltés hibakezeléssel
-        return Promise.all(
+        return Promise.allSettled(
           urlsToCache.map(url => 
             cache.add(url).catch(error => {
-              console.error('Nem sikerült cache-elni:', url, error);
-              return Promise.resolve(); // Folytatjuk a többi URL-lel
+              console.error(`Nem sikerült cache-elni: ${url}`, error);
+              return null; // Ha egy URL nem sikerül, folytassuk a többivel
             })
           )
         );
       })
   );
-  // Azonnal aktiváljuk az új service workert
   self.skipWaiting();
 });
 
