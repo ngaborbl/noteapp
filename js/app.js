@@ -1,5 +1,5 @@
 // Import ES6 module szintaxissal
-import { notificationManager } from './notifications.js';
+import { notificationManager } from './notification.js';
 
 // Firebase konfiguráció
 const firebaseConfig = {
