@@ -1,7 +1,10 @@
-// Import ES6 module szintaxissal
-import { notificationManager } from './notifications.js';
+// Firebase inicializálás - app.js elején
+import { initializeApp } from 'firebase/app';
+import { getFirestore } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
+import { getMessaging } from 'firebase/messaging';
+import { getAnalytics } from 'firebase/analytics';
 
-// Firebase konfiguráció
 const firebaseConfig = {
   apiKey: "AIzaSyBsQMs29I_kwN5idgcyAdz0etWfv7ymyz8",
   authDomain: "noteapp-5c98e.firebaseapp.com",
@@ -12,10 +15,12 @@ const firebaseConfig = {
   measurementId: "G-3NSSJ1FT7S"
 };
 
-// Firebase inicializálása
-firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
-const auth = firebase.auth();
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+const messaging = getMessaging(app);
+const analytics = getAnalytics(app);
 
 // Naplózási konfiguráció
 const logConfig = {

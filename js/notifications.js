@@ -1,4 +1,7 @@
 // notifications.js
+import { getMessaging, getToken } from 'firebase/messaging';
+import { getFirestore, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
 
 class NotificationManager {
   constructor() {
@@ -7,6 +10,9 @@ class NotificationManager {
     this.pendingNotifications = new Map();
     this.retryAttempts = 3;
     this.vapidKey = "knDCQxYIDpfB9UONeHF2E_VIUup6XTH__TkBIIvz31w";
+    this.messaging = null;
+    this.db = getFirestore();
+    this.auth = getAuth();
   }
 
   async initialize() {
@@ -28,16 +34,18 @@ class NotificationManager {
       console.log("Service Worker registered successfully");
 
       // Initialize Firebase Messaging if available
-      if (firebase.messaging.isSupported()) {
-        const messaging = firebase.messaging();
-        const token = await messaging.getToken({
-          vapidKey: "knDCQxYIDpfB9UONeHF2E_VIUup6XTH__TkBIIvz31w",
+      try {
+        this.messaging = getMessaging();
+        const token = await getToken(this.messaging, {
+          vapidKey: this.vapidKey,
           serviceWorkerRegistration: this.swRegistration
         });
         
         if (token) {
           await this.updateUserFCMToken(token);
         }
+      } catch (error) {
+        console.error("Failed to initialize Firebase Messaging:", error);
       }
 
       this.initialized = true;
@@ -58,11 +66,12 @@ class NotificationManager {
       const permission = await Notification.requestPermission();
       
       if (permission === "granted") {
-        const user = firebase.auth().currentUser;
+        const user = this.auth.currentUser;
         if (user) {
-          await firebase.firestore().collection('users').doc(user.uid).update({
+          const userRef = doc(this.db, 'users', user.uid);
+          await updateDoc(userRef, {
             notificationsEnabled: true,
-            lastNotificationUpdate: firebase.firestore.FieldValue.serverTimestamp()
+            lastNotificationUpdate: serverTimestamp()
           });
         }
         return true;
@@ -158,11 +167,12 @@ class NotificationManager {
 
   async updateUserFCMToken(token) {
     try {
-      const user = firebase.auth().currentUser;
+      const user = this.auth.currentUser;
       if (user) {
-        await firebase.firestore().collection('users').doc(user.uid).update({
+        const userRef = doc(this.db, 'users', user.uid);
+        await updateDoc(userRef, {
           fcmToken: token,
-          lastTokenUpdate: firebase.firestore.FieldValue.serverTimestamp()
+          lastTokenUpdate: serverTimestamp()
         });
         return true;
       }
