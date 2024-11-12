@@ -3,23 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#4CAF50">
     <title>NoteApp PWA</title>
-    
-    <!-- Manifest és stílusok -->
+    <meta name="theme-color" content="#4CAF50">
     <link rel="manifest" href="/manifest.json">
-    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="css/style.css">
     
-    <!-- Firebase SDK és inicializálás -->
-    <script type="module">
-        // Import the functions you need from the SDKs you need
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
-        import { getAuth } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
-        import { getFirestore } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-        import { getMessaging } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging.js";
-        import { getAnalytics } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-analytics.js";
+    <!-- Firebase SDK betöltése -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js"></script>
 
-        // Your web app's Firebase configuration
+    <!-- Firebase inicializálása -->
+    <script>
+        // Firebase konfiguráció
         const firebaseConfig = {
             apiKey: "AIzaSyBsQMs29I_kwN5idgcyAdz0etWfv7ymyz8",
             authDomain: "noteapp-5c98e.firebaseapp.com",
@@ -30,31 +27,25 @@
             measurementId: "G-3NSSJ1FT7S"
         };
 
-        // Initialize Firebase
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const messaging = getMessaging(app);
-        const analytics = getAnalytics(app);
+        // Firebase inicializálása
+        firebase.initializeApp(firebaseConfig);
 
-        // Make Firebase instances available globally
-        window.fbApp = app;
-        window.fbAuth = auth;
-        window.fbDb = db;
-        window.fbMessaging = messaging;
-        window.fbAnalytics = analytics;
+        // Firebase szolgáltatások inicializálása és globális változókba mentése
+        window.fbDb = firebase.firestore();
+        window.fbAuth = firebase.auth();
+        window.fbMessaging = firebase.messaging();
     </script>
 
-    <!-- App scripts as modules -->
-    <script type="module" src="/js/notifications.js"></script>
-    <script type="module" src="/js/app.js"></script>
+    <!-- Alkalmazás modulok -->
+    <script type="module" src="js/notifications.js"></script>
+    <script type="module" src="js/app.js"></script>
 </head>
 <body>
     <div class="container">
-        <header class="header-top">
+        <div class="header-top">
             <div id="user-info"></div>
             <h1>NoteApp PWA</h1>
-        </header>
+        </div>
 
         <nav>
             <a href="#" id="dashboard-menu" class="nav-item">
@@ -87,13 +78,9 @@
             </a>
         </nav>
 
-        <main id="content" role="main">
-            <!-- Dynamic content will be loaded here -->
-        </main>
+        <main id="content" role="main"></main>
 
-        <footer>
-            <p>© 2024 NoteApp PWA v1.88 - Nagy Gábor</p>
-        </footer>
+        <footer>© 2024 NoteApp PWA v1.88 - Nagy Gábor</footer>
     </div>
 </body>
 </html>
