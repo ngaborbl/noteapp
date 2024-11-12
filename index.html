@@ -8,37 +8,30 @@
     <link rel="manifest" href="/manifest.json">
     <link rel="stylesheet" href="css/style.css">
     
-    <!-- Firebase SDK betöltése -->
+    <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js"></script>
 
-    <!-- Firebase inicializálása -->
+    <!-- Firebase inicializálás -->
+    <script src="js/firebase-config.js" defer></script>
+
+    <!-- Várjunk a Firebase inicializálására -->
     <script>
-        // Firebase konfiguráció
-        const firebaseConfig = {
-            apiKey: "AIzaSyBsQMs29I_kwN5idgcyAdz0etWfv7ymyz8",
-            authDomain: "noteapp-5c98e.firebaseapp.com",
-            projectId: "noteapp-5c98e",
-            storageBucket: "noteapp-5c98e.appspot.com",
-            messagingSenderId: "10607490745",
-            appId: "1:10607490745:web:5cdff4c9c5e78d7c798d68",
-            measurementId: "G-3NSSJ1FT7S"
-        };
-
-        // Firebase inicializálása
-        firebase.initializeApp(firebaseConfig);
-
-        // Firebase szolgáltatások inicializálása és globális változókba mentése
-        window.fbDb = firebase.firestore();
-        window.fbAuth = firebase.auth();
-        window.fbMessaging = firebase.messaging();
+        window.addEventListener('load', function() {
+            // Ellenőrizzük, hogy a Firebase inicializálódott-e
+            if (window.fbDb && window.fbAuth) {
+                // Ha igen, betöltjük az alkalmazás kódját
+                const appScript = document.createElement('script');
+                appScript.src = 'js/app.js';
+                appScript.type = 'module';
+                document.head.appendChild(appScript);
+            } else {
+                console.error('Firebase szolgáltatások nem inicializálódtak megfelelően');
+            }
+        });
     </script>
-
-    <!-- Alkalmazás modulok -->
-    <script type="module" src="js/notifications.js"></script>
-    <script type="module" src="js/app.js"></script>
 </head>
 <body>
     <div class="container">
