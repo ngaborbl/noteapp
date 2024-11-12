@@ -1,26 +1,9 @@
-// Firebase inicializálás - app.js elején
-import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth';
-import { getMessaging } from 'firebase/messaging';
-import { getAnalytics } from 'firebase/analytics';
+// Import ES6 module szintaxissal
+import { notificationManager } from './notifications.js';
 
-const firebaseConfig = {
-  apiKey: "AIzaSyBsQMs29I_kwN5idgcyAdz0etWfv7ymyz8",
-  authDomain: "noteapp-5c98e.firebaseapp.com",
-  projectId: "noteapp-5c98e",
-  storageBucket: "noteapp-5c98e.appspot.com",
-  messagingSenderId: "10607490745",
-  appId: "1:10607490745:web:5cdff4c9c5e78d7c798d68",
-  measurementId: "G-3NSSJ1FT7S"
-};
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const auth = getAuth(app);
-const messaging = getMessaging(app);
-const analytics = getAnalytics(app);
+// Firebase szolgáltatások elérése a globális változókon keresztül
+const db = window.fbDb;
+const auth = window.fbAuth;
 
 // Naplózási konfiguráció
 const logConfig = {
@@ -87,6 +70,12 @@ function truncateData(data) {
   return data;
 }
 
+// Timestamp helper függvény
+function getTimestamp() {
+  const now = new Date();
+  return now.toISOString();
+}
+
 // Persistence beállítása
 db.enablePersistence()
   .then(() => {
@@ -100,7 +89,7 @@ db.enablePersistence()
       logWarn("Persistence nem támogatott");
     }
   });
-
+  
 // Alkalmazás inicializálása
 async function initApp() {
   logDebug("Alkalmazás inicializálása...");
@@ -147,6 +136,140 @@ async function initApp() {
       showLoginForm();
     }
   });
+}
+
+// Bejelentkezés kezelése
+async function handleLogin(e) {
+  e.preventDefault();
+  
+  const email = document.getElementById('login-email').value;
+  const password = document.getElementById('login-password').value;
+  const rememberMe = document.getElementById('remember-me').checked;
+  
+  logDebug("Bejelentkezés kezdeményezve", { email, rememberMe });
+  
+  try {
+    // Persistence beállítása
+    await window.fbAuth.setPersistence(
+      rememberMe ? 'local' : 'session'
+    );
+    
+    // Bejelentkezés
+    const userCredential = await auth.signInWithEmailAndPassword(email, password);
+    
+    // "Emlékezz rám" beállítás mentése
+    localStorage.setItem('rememberMe', rememberMe);
+    
+    // Utolsó bejelentkezés frissítése Firestore-ban
+    await db.collection('users').doc(userCredential.user.uid).update({
+      lastLogin: window.fbDb.serverTimestamp()
+    });
+
+    logInfo("Sikeres bejelentkezés", { 
+      userId: userCredential.user.uid,
+      email: userCredential.user.email 
+    });
+    
+  } catch (error) {
+    logError("Bejelentkezési hiba", error);
+    
+    const errorElement = document.getElementById('auth-error');
+    if (errorElement) {
+      switch(error.code) {
+        case 'auth/user-not-found':
+          errorElement.textContent = 'Nem létezik felhasználó ezzel az email címmel';
+          break;
+        case 'auth/wrong-password':
+          errorElement.textContent = 'Hibás jelszó';
+          break;
+        case 'auth/too-many-requests':
+          errorElement.textContent = 'Túl sok sikertelen próbálkozás. Próbáld újra később.';
+          break;
+        default:
+          errorElement.textContent = 'Hiba történt a bejelentkezés során';
+      }
+    }
+  }
+}
+
+// Regisztráció kezelése
+async function handleRegistration(e) {
+  e.preventDefault();
+  
+  const name = document.getElementById('register-name').value;
+  const email = document.getElementById('register-email').value;
+  const password = document.getElementById('register-password').value;
+  
+  logDebug("Regisztráció kezdeményezve", { email, name });
+  
+  try {
+    // Felhasználó létrehozása
+    const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+    
+    // Felhasználói név beállítása
+    await userCredential.user.updateProfile({
+      displayName: name
+    });
+
+    // Felhasználói dokumentum létrehozása
+    await db.collection('users').doc(userCredential.user.uid).set({
+      displayName: name,
+      email: email,
+      createdAt: window.fbDb.serverTimestamp(),
+      lastLogin: window.fbDb.serverTimestamp(),
+      avatarColor: '#4CAF50',
+      theme: 'light',
+      defaultNotifyTime: '10',
+      debugMode: false
+    });
+
+    logInfo("Sikeres regisztráció", { 
+      userId: userCredential.user.uid,
+      email: email,
+      name: name
+    });
+    
+  } catch (error) {
+    logError("Regisztrációs hiba", error);
+    
+    const errorElement = document.getElementById('auth-error');
+    if (errorElement) {
+      switch(error.code) {
+        case 'auth/email-already-in-use':
+          errorElement.textContent = 'Ez az email cím már használatban van';
+          break;
+        case 'auth/invalid-email':
+          errorElement.textContent = 'Érvénytelen email cím';
+          break;
+        case 'auth/weak-password':
+          errorElement.textContent = 'A jelszó túl gyenge';
+          break;
+        default:
+          errorElement.textContent = 'Hiba történt a regisztráció során';
+      }
+    }
+  }
+}
+
+// Kijelentkezés
+async function handleLogout() {
+  logDebug("Kijelentkezés kezdeményezve");
+  
+  try {
+    // Értesítések törlése
+    notificationManager.clearScheduledNotifications();
+    
+    // Kijelentkezés
+    await auth.signOut();
+    
+    // UI frissítése
+    document.querySelector('nav').style.display = 'none';
+    showLoginForm();
+    
+    logInfo('Sikeres kijelentkezés');
+  } catch (error) {
+    logError('Hiba a kijelentkezésnél', error);
+  }
 }
 
 // Bejelentkezési űrlap megjelenítése
@@ -226,76 +349,6 @@ function showLoginForm() {
   document.getElementById('remember-me').checked = rememberMe;
   
   logDebug("Bejelentkező űrlap megjelenítve");
-}
-
-// Jelszó láthatóság kapcsolása
-function togglePasswordVisibility(inputId) {
-  const input = document.getElementById(inputId);
-  const button = input.nextElementSibling;
-  
-  if (input.type === 'password') {
-    input.type = 'text';
-    button.textContent = '🔒';
-  } else {
-    input.type = 'password';
-    button.textContent = '👁';
-  }
-}
-
-// Bejelentkezés kezelése
-async function handleLogin(e) {
-  e.preventDefault();
-  
-  const email = document.getElementById('login-email').value;
-  const password = document.getElementById('login-password').value;
-  const rememberMe = document.getElementById('remember-me').checked;
-  
-  logDebug("Bejelentkezés kezdeményezve", { email, rememberMe });
-  
-  try {
-    // Persistence beállítása
-    await firebase.auth().setPersistence(
-      rememberMe ? 
-        firebase.auth.Auth.Persistence.LOCAL : 
-        firebase.auth.Auth.Persistence.SESSION
-    );
-    
-    // Bejelentkezés
-    const userCredential = await auth.signInWithEmailAndPassword(email, password);
-    
-    // "Emlékezz rám" beállítás mentése
-    localStorage.setItem('rememberMe', rememberMe);
-    
-    // Utolsó bejelentkezés frissítése Firestore-ban
-    await db.collection('users').doc(userCredential.user.uid).update({
-      lastLogin: firebase.firestore.FieldValue.serverTimestamp()
-    });
-
-    logInfo("Sikeres bejelentkezés", { 
-      userId: userCredential.user.uid,
-      email: userCredential.user.email 
-    });
-    
-  } catch (error) {
-    logError("Bejelentkezési hiba", error);
-    
-    const errorElement = document.getElementById('auth-error');
-    if (errorElement) {
-      switch(error.code) {
-        case 'auth/user-not-found':
-          errorElement.textContent = 'Nem létezik felhasználó ezzel az email címmel';
-          break;
-        case 'auth/wrong-password':
-          errorElement.textContent = 'Hibás jelszó';
-          break;
-        case 'auth/too-many-requests':
-          errorElement.textContent = 'Túl sok sikertelen próbálkozás. Próbáld újra később.';
-          break;
-        default:
-          errorElement.textContent = 'Hiba történt a bejelentkezés során';
-      }
-    }
-  }
 }
 
 // Elfelejtett jelszó űrlap megjelenítése
@@ -404,62 +457,17 @@ function showRegistrationForm() {
     .addEventListener('submit', handleRegistration);
 }
 
-// Regisztráció kezelése
-async function handleRegistration(e) {
-  e.preventDefault();
+// Jelszó láthatóság kapcsolása
+function togglePasswordVisibility(inputId) {
+  const input = document.getElementById(inputId);
+  const button = input.nextElementSibling;
   
-  const name = document.getElementById('register-name').value;
-  const email = document.getElementById('register-email').value;
-  const password = document.getElementById('register-password').value;
-  
-  logDebug("Regisztráció kezdeményezve", { email, name });
-  
-  try {
-    // Felhasználó létrehozása
-    const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-    
-    // Felhasználói név beállítása
-    await userCredential.user.updateProfile({
-      displayName: name
-    });
-
-    // Felhasználói dokumentum létrehozása
-    await db.collection('users').doc(userCredential.user.uid).set({
-      displayName: name,
-      email: email,
-      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-      lastLogin: firebase.firestore.FieldValue.serverTimestamp(),
-      avatarColor: '#4CAF50',
-      theme: 'light',
-      defaultNotifyTime: '10',
-      debugMode: false
-    });
-
-    logInfo("Sikeres regisztráció", { 
-      userId: userCredential.user.uid,
-      email: email,
-      name: name
-    });
-    
-  } catch (error) {
-    logError("Regisztrációs hiba", error);
-    
-    const errorElement = document.getElementById('auth-error');
-    if (errorElement) {
-      switch(error.code) {
-        case 'auth/email-already-in-use':
-          errorElement.textContent = 'Ez az email cím már használatban van';
-          break;
-        case 'auth/invalid-email':
-          errorElement.textContent = 'Érvénytelen email cím';
-          break;
-        case 'auth/weak-password':
-          errorElement.textContent = 'A jelszó túl gyenge';
-          break;
-        default:
-          errorElement.textContent = 'Hiba történt a regisztráció során';
-      }
-    }
+  if (input.type === 'password') {
+    input.type = 'text';
+    button.textContent = '🔒';
+  } else {
+    input.type = 'password';
+    button.textContent = '👁';
   }
 }
 
@@ -489,50 +497,6 @@ function showModule(moduleId) {
     default:
       contentElement.innerHTML = `<h2>${moduleId.charAt(0).toUpperCase() + moduleId.slice(1)}</h2>
                                 <p>Ez a ${moduleId} modul tartalma.</p>`;
-  }
-}
-
-// Cleanup függvény a modulváltáshoz
-function cleanupModules() {
-  logDebug("Cleanup kezdése");
-  
-  // Listener-ek eltávolítása
-  const listeners = [
-    'notesUnsubscribe',
-    'mainNotesUnsubscribe',
-    'appointmentsUnsubscribe',
-    'mainAppointmentsUnsubscribe'
-  ];
-
-  listeners.forEach(listener => {
-    if (window[listener]) {
-      logDebug(`${listener} eltávolítása`);
-      window[listener]();
-      window[listener] = null;
-    }
-  });
-
-  // Statisztika listener-ek eltávolítása
-  if (window.statsUnsubscribe) {
-    window.statsUnsubscribe.forEach(unsubscribe => {
-      try {
-        unsubscribe();
-      } catch (error) {
-        logError("Hiba a statisztika listener eltávolításakor:", error);
-      }
-    });
-    window.statsUnsubscribe = [];
-  }
-
-  // Cache kezelés
-  try {
-    db.disableNetwork().then(() => {
-      return db.enableNetwork();
-    }).catch(err => {
-      logError("Hálózati újracsatlakozási hiba:", err);
-    });
-  } catch (error) {
-    logError("Cleanup hiba:", error);
   }
 }
 
@@ -739,27 +703,47 @@ function setupDashboardEvents() {
   logDebug("Dashboard események beállítva");
 }
 
-// Meglévő időpontok értesítéseinek beállítása
-async function setupExistingAppointmentNotifications() {
-  if (Notification.permission !== 'granted') return;
+// Cleanup függvény a modulváltáshoz
+function cleanupModules() {
+  logDebug("Cleanup kezdése");
+  
+  // Listener-ek eltávolítása
+  const listeners = [
+    'notesUnsubscribe',
+    'mainNotesUnsubscribe',
+    'appointmentsUnsubscribe',
+    'mainAppointmentsUnsubscribe'
+  ];
 
-  const now = new Date();
-  const query = db.collection('appointments')
-    .where('date', '>', firebase.firestore.Timestamp.fromDate(now))
-    .orderBy('date', 'asc');
+  listeners.forEach(listener => {
+    if (window[listener]) {
+      logDebug(`${listener} eltávolítása`);
+      window[listener]();
+      window[listener] = null;
+    }
+  });
 
-  try {
-    const snapshot = await query.get();
-    snapshot.forEach(doc => {
-      const appointment = {
-        id: doc.id,
-        ...doc.data()
-      };
-      notificationManager.scheduleAppointmentNotification(appointment);
+  // Statisztika listener-ek eltávolítása
+  if (window.statsUnsubscribe) {
+    window.statsUnsubscribe.forEach(unsubscribe => {
+      try {
+        unsubscribe();
+      } catch (error) {
+        logError("Hiba a statisztika listener eltávolításakor:", error);
+      }
     });
-    logInfo('Meglévő időpontok értesítései beállítva', { count: snapshot.size });
+    window.statsUnsubscribe = [];
+  }
+
+  // Cache kezelés
+  try {
+    db.disableNetwork().then(() => {
+      return db.enableNetwork();
+    }).catch(err => {
+      logError("Hálózati újracsatlakozási hiba:", err);
+    });
   } catch (error) {
-    logError('Hiba a meglévő időpontok értesítéseinek beállításakor', error);
+    logError("Cleanup hiba:", error);
   }
 }
 
@@ -782,8 +766,8 @@ function loadDashboardStats() {
   tomorrow.setDate(tomorrow.getDate() + 1);
 
   const todayAppointmentsQuery = db.collection('appointments')
-    .where('date', '>=', today)
-    .where('date', '<', tomorrow);
+    .where('date', '>=', window.fbDb.Timestamp.fromDate(today))
+    .where('date', '<', window.fbDb.Timestamp.fromDate(tomorrow));
 
   window.statsUnsubscribe.push(
     todayAppointmentsQuery.onSnapshot(snapshot => {
@@ -793,7 +777,7 @@ function loadDashboardStats() {
 
   // Következő időpont követése
   const nextAppointmentQuery = db.collection('appointments')
-    .where('date', '>=', new Date())
+    .where('date', '>=', window.fbDb.Timestamp.fromDate(new Date()))
     .orderBy('date', 'asc')
     .limit(1);
 
@@ -886,8 +870,8 @@ function loadUpcomingAppointments(range = 'week') {
   }
 
   const query = db.collection('appointments')
-    .where('date', '>=', now)
-    .where('date', '<=', endDate)
+    .where('date', '>=', window.fbDb.Timestamp.fromDate(now))
+    .where('date', '<=', window.fbDb.Timestamp.fromDate(endDate))
     .orderBy('date', 'asc')
     .limit(5);
 
@@ -913,6 +897,30 @@ function loadUpcomingAppointments(range = 'week') {
     logError('Hiba az időpontok követésekor', error);
     appointmentsList.innerHTML = '<li class="error-message">Hiba történt az időpontok betöltésekor</li>';
   });
+}
+
+// Meglévő időpontok értesítéseinek beállítása
+async function setupExistingAppointmentNotifications() {
+  if (Notification.permission !== 'granted') return;
+
+  const now = new Date();
+  const query = db.collection('appointments')
+    .where('date', '>', window.fbDb.Timestamp.fromDate(now))
+    .orderBy('date', 'asc');
+
+  try {
+    const snapshot = await query.get();
+    snapshot.forEach(doc => {
+      const appointment = {
+        id: doc.id,
+        ...doc.data()
+      };
+      notificationManager.scheduleAppointmentNotification(appointment);
+    });
+    logInfo('Meglévő időpontok értesítései beállítva', { count: snapshot.size });
+  } catch (error) {
+    logError('Hiba a meglévő időpontok értesítéseinek beállításakor', error);
+  }
 }
 
 // UI elemek létrehozása
@@ -966,204 +974,3 @@ function createAppointmentElement(id, appointment) {
   return li;
 }
 
-// Státusz és hiba kezelés
-function showStatusMessage(message, type = 'info') {
-  const statusContainer = document.getElementById('status-container') || 
-    createStatusContainer();
-
-  const statusElement = document.createElement('div');
-  statusElement.className = `status-message ${type}`;
-  statusElement.textContent = message;
-
-  statusContainer.appendChild(statusElement);
-
-  setTimeout(() => {
-    statusElement.style.opacity = '0';
-    setTimeout(() => statusElement.remove(), 300);
-  }, 3000);
-}
-
-function createStatusContainer() {
-  const container = document.createElement('div');
-  container.id = 'status-container';
-  document.body.appendChild(container);
-  return container;
-}
-
-function showErrorMessage(message) {
-  const errorContainer = document.createElement('div');
-  errorContainer.className = 'error-message';
-  errorContainer.innerHTML = `
-    <div class="error-content">
-      <h3>Hiba történt</h3>
-      <p>${message}</p>
-      <button onclick="this.parentElement.remove()">Bezárás</button>
-    </div>
-  `;
-  document.body.appendChild(errorContainer);
-}
-
-// Online/Offline állapot kezelése
-function handleOnlineStatus(event) {
-  const isOnline = event.type === 'online';
-  
-  logDebug(`Alkalmazás ${isOnline ? 'online' : 'offline'} módba váltott`);
-  
-  showStatusMessage(
-    isOnline ? 'Kapcsolódva' : 'Nincs internetkapcsolat',
-    isOnline ? 'success' : 'warning'
-  );
-
-  if (isOnline) {
-    db.enableNetwork()
-      .then(() => logDebug('Hálózati kapcsolat visszaállítva'))
-      .catch(error => logError('Hiba a hálózati kapcsolat visszaállításakor', error));
-  } else {
-    db.disableNetwork()
-      .then(() => logDebug('Hálózati kapcsolat letiltva'))
-      .catch(error => logError('Hiba a hálózati kapcsolat letiltásakor', error));
-  }
-}
-
-// User avatar kezelése
-async function initUserAvatar() {
-  const user = auth.currentUser;
-  if (!user) return;
-
-  try {
-    const userDoc = await db.collection('users').doc(user.uid).get();
-    const userData = userDoc.exists ? userDoc.data() : {};
-    const avatarColor = userData.avatarColor || '#4CAF50';
-    
-    const avatarElement = document.getElementById('user-avatar');
-    if (avatarElement) {
-      const initials = (user.displayName || 'U')
-        .split(' ')
-        .map(word => word[0])
-        .join('')
-        .toUpperCase();
-      
-      avatarElement.style.backgroundColor = avatarColor;
-      avatarElement.textContent = initials;
-    }
-  } catch (error) {
-    logError('Hiba az avatar inicializálásakor', error);
-  }
-}
-
-// Navigáció kezelése
-function setupNavigation() {
-  const menuItems = document.querySelectorAll('nav a');
-  menuItems.forEach(item => {
-    item.addEventListener('click', (e) => {
-      e.preventDefault();
-      const moduleId = item.id.replace('-menu', '');
-      
-      menuItems.forEach(mi => mi.classList.remove('active'));
-      item.classList.add('active');
-      
-      const content = document.getElementById('content');
-      content.style.opacity = '0';
-      
-      setTimeout(() => {
-        showModule(moduleId);
-        content.style.opacity = '1';
-      }, 200);
-    });
-  });
-
-  const logoutButton = document.getElementById('logout-menu');
-  if (logoutButton) {
-    logoutButton.addEventListener('click', async (e) => {
-      e.preventDefault();
-      if (confirm('Biztosan kijelentkezel?')) {
-        await logout();
-      }
-    });
-  }
-}
-
-// PWA telepítés kezelése
-function setupPWAInstall() {
-  let deferredPrompt;
-
-  window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredPrompt = e;
-    
-    const installButton = document.createElement('button');
-    installButton.className = 'install-button';
-    installButton.innerHTML = `
-      <i class="download-icon"></i>
-      Telepítés
-    `;
-    
-    installButton.addEventListener('click', async () => {
-      if (!deferredPrompt) return;
-      
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      
-      logDebug('PWA telepítési válasz', { outcome });
-      deferredPrompt = null;
-      installButton.remove();
-    });
-
-    document.querySelector('nav').appendChild(installButton);
-  });
-}
-
-// Alkalmazás inicializálása és eseménykezelők beállítása
-document.addEventListener('DOMContentLoaded', async () => {
-  logDebug("DOM betöltődött, alkalmazás inicializálása kezdődik");
-  
-  try {
-    if ('serviceWorker' in navigator) {
-      const registration = await navigator.serviceWorker.register('/service-worker.js');
-      logInfo('Service Worker sikeresen regisztrálva', registration);
-    }
-
-    window.addEventListener('online', handleOnlineStatus);
-    window.addEventListener('offline', handleOnlineStatus);
-
-    await notificationManager.initialize();
-    await initApp();
-    setupNavigation();
-
-    const savedTheme = localStorage.getItem('theme') || 'light';
-    applyTheme(savedTheme);
-
-    const debugMode = localStorage.getItem('debugMode') === 'true';
-    setDebugMode(debugMode);
-
-    setupPWAInstall();
-
-    logDebug("Alkalmazás inicializálása befejezve", {
-      theme: savedTheme,
-      debugMode
-    });
-  } catch (error) {
-    logError('Hiba az alkalmazás inicializálásakor', error);
-    showErrorMessage('Hiba történt az alkalmazás betöltésekor');
-  }
-});
-
-// Export
-export {
-  notificationManager,
-  initApp,
-  loadDashboard,
-  setupDashboardEvents
-};
-
-// Timestamp helper függvény
-function getTimestamp() {
-  const now = new Date();
-  return now.toISOString();
-}
-
-// Verzió információ
-logInfo("NoteApp v1.88 betöltve", { 
-  timestamp: new Date().toISOString(),
-  environment: self.location.hostname === 'localhost' ? 'development' : 'production'
-});
