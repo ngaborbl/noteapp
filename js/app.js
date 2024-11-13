@@ -2,6 +2,9 @@
 import { notificationManager } from './notifications.js';
 import { createAppointmentElement, showEditAppointmentModal } from './ui-utils.js';
 
+// Az exportálást itt kell hozzáadni:
+export { initApp };
+
 // Firebase szolgáltatások elérése a globális változókon keresztül
 const db = window.fbDb;
 const auth = window.fbAuth;
@@ -78,7 +81,7 @@ function getTimestamp() {
 }
   
 // Alkalmazás inicializálása
-async function initApp() {
+export async function initApp() {
   logDebug("Alkalmazás inicializálása...");
   const navElement = document.querySelector('nav');
   if (navElement) {

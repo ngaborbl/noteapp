@@ -1,3 +1,5 @@
+// firebase-config.js
+
 // Konfiguráció
 const firebaseConfig = {
   apiKey: "AIzaSyBsQMs29I_kwN5idgcyAdz0etWfv7ymyz8",
@@ -21,17 +23,13 @@ const initializeFirebase = async () => {
     // Firebase beállítások
     const settings = {
       cacheSizeBytes: firebase.firestore.CACHE_SIZE_UNLIMITED,
-      merge: true  // Ezt adjuk hozzá
+      merge: true
     };
     db.settings(settings);
 
     try {
-      // Az elavult metódus helyett használjuk az új cache beállítást
       await db.enablePersistence({
-        synchronizeTabs: true,
-        cache: {
-          enable: true
-        }
+        synchronizeTabs: true
       });
       console.log("Offline persistence sikeresen engedélyezve");
     } catch (err) {
@@ -42,6 +40,7 @@ const initializeFirebase = async () => {
       }
     }
 
+    // Globális változók beállítása
     window.fbDb = db;
     window.fbAuth = firebase.auth();
     window.fbMessaging = firebase.messaging();
@@ -55,11 +54,14 @@ const initializeFirebase = async () => {
 };
 
 // Firebase inicializálása és alkalmazás indítása
-initializeFirebase().then(success => {
+document.addEventListener('DOMContentLoaded', async () => {
+  const success = await initializeFirebase();
   if (success) {
-    // Itt indíthatjuk az alkalmazást
+    // Itt indítjuk el az alkalmazást
     if (typeof initApp === 'function') {
       initApp();
+    } else {
+      console.error("initApp függvény nem található");
     }
   } else {
     console.error("Az alkalmazás nem tudott elindulni a Firebase inicializálási hiba miatt");
