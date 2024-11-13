@@ -1790,22 +1790,7 @@ function createAppointmentElement(id, appointment) {
   return div;
 }
 
-// Időpont szerkesztése
-async function editAppointment(appointmentId) {
-  logDebug("Időpont szerkesztése", { appointmentId });
-  
-  try {
-    const doc = await db.collection('appointments').doc(appointmentId).get();
-    if (!doc.exists) {
-      throw new Error('Időpont nem található');
-    }
-    
-    const appointment = doc.data();
-    const appointmentDate = appointment.date.toDate();
-    const dateString = appointmentDate.toISOString().split('T')[0];
-    const timeString = appointmentDate.toTimeString().slice(0, 5);
-    
-    // Szerkesztő modál megjelenítése
+// Időpont szerkesztő modál megjelenítése
 async function showEditAppointmentModal(appointmentId, appointment) {
   const appointmentDate = appointment.date.toDate();
   const dateString = appointmentDate.toISOString().split('T')[0];
@@ -1923,6 +1908,25 @@ async function showEditAppointmentModal(appointmentId, appointment) {
       }
     ]
   });
+}
+
+// Időpont szerkesztés indítása
+async function editAppointment(appointmentId) {
+  logDebug("Időpont szerkesztése", { appointmentId });
+  
+  try {
+    const doc = await db.collection('appointments').doc(appointmentId).get();
+    if (!doc.exists) {
+      throw new Error('Időpont nem található');
+    }
+    
+    const appointment = doc.data();
+    await showEditAppointmentModal(appointmentId, appointment);
+    
+  } catch (error) {
+    logError("Hiba az időpont szerkesztésekor", error);
+    alert('Nem sikerült betölteni az időpontot');
+  }
 }
 
 // Időpont törlése
