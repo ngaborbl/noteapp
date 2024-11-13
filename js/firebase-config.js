@@ -1,6 +1,4 @@
 // firebase-config.js
-
-// Konfiguráció
 const firebaseConfig = {
   apiKey: "AIzaSyBsQMs29I_kwN5idgcyAdz0etWfv7ymyz8",
   authDomain: "noteapp-5c98e.firebaseapp.com",
@@ -15,9 +13,12 @@ const firebaseConfig = {
 const initializeFirebase = async () => {
   try {
     // Firebase inicializálása
-    firebase.initializeApp(firebaseConfig);
+    const app = firebase.initializeApp(firebaseConfig);
 
-    // Persistence beállítása
+    // Auth inicializálása
+    const auth = firebase.auth();
+    
+    // Firestore inicializálása
     const db = firebase.firestore();
     
     // Firebase beállítások
@@ -27,6 +28,7 @@ const initializeFirebase = async () => {
     };
     db.settings(settings);
 
+    // Persistence beállítása
     try {
       await db.enablePersistence({
         synchronizeTabs: true
@@ -40,10 +42,20 @@ const initializeFirebase = async () => {
       }
     }
 
+    // Messaging inicializálása
+    let messaging = null;
+    try {
+      messaging = firebase.messaging();
+      await messaging.requestPermission();
+    } catch (err) {
+      console.warn("Messaging nem inicializálható:", err);
+    }
+
     // Globális változók beállítása
+    window.fbApp = app;
     window.fbDb = db;
-    window.fbAuth = firebase.auth();
-    window.fbMessaging = firebase.messaging();
+    window.fbAuth = auth;
+    window.fbMessaging = messaging;
 
     console.log("Firebase sikeresen inicializálva");
     return true;
@@ -57,9 +69,8 @@ const initializeFirebase = async () => {
 document.addEventListener('DOMContentLoaded', async () => {
   const success = await initializeFirebase();
   if (success) {
-    // Itt indítjuk el az alkalmazást
-    if (typeof initApp === 'function') {
-      initApp();
+    if (typeof window.initApp === 'function') {
+      window.initApp();
     } else {
       console.error("initApp függvény nem található");
     }

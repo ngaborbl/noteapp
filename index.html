@@ -54,16 +54,46 @@
         </footer>
     </div>
 
-    <!-- Firebase SDK -->
+    <!-- Firebase SDK - fontos a sorrend! -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js"></script>
 
-    <!-- App scripts -->
+    <!-- App scripts - sorrendiség fontos! -->
     <script src="js/firebase-config.js"></script>
     <script type="module" src="js/notifications.js"></script>
     <script type="module" src="js/ui-utils.js"></script>
     <script type="module" src="js/app.js"></script>
+
+    <!-- Service Worker regisztráció -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/service-worker.js')
+                    .then(registration => {
+                        console.log('Service Worker regisztrálva:', registration);
+                    })
+                    .catch(error => {
+                        console.error('Service Worker hiba:', error);
+                    });
+            });
+        }
+    </script>
+
+    <!-- PWA manifest -->
+    <link rel="manifest" href="/manifest.json">
+    
+    <!-- PWA meta tagek -->
+    <meta name="theme-color" content="#4CAF50">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="NoteApp">
+    
+    <!-- PWA ikonok -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-16.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192.png">
+</head>
 </body>
 </html>
