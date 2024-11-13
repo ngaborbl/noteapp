@@ -20,12 +20,19 @@ const initializeFirebase = async () => {
     
     // Firebase beállítások
     const settings = {
-      cacheSizeBytes: firebase.firestore.CACHE_SIZE_UNLIMITED
+      cacheSizeBytes: firebase.firestore.CACHE_SIZE_UNLIMITED,
+      merge: true  // Ezt adjuk hozzá
     };
     db.settings(settings);
 
     try {
-      await db.enableIndexedDbPersistence();
+      // Az elavult metódus helyett használjuk az új cache beállítást
+      await db.enablePersistence({
+        synchronizeTabs: true,
+        cache: {
+          enable: true
+        }
+      });
       console.log("Offline persistence sikeresen engedélyezve");
     } catch (err) {
       if (err.code === 'failed-precondition') {
@@ -35,7 +42,6 @@ const initializeFirebase = async () => {
       }
     }
 
-    // Globális változók beállítása
     window.fbDb = db;
     window.fbAuth = firebase.auth();
     window.fbMessaging = firebase.messaging();

@@ -76,20 +76,6 @@ function getTimestamp() {
   const now = new Date();
   return now.toISOString();
 }
-
-// Persistence beállítása
-db.enablePersistence()
-  .then(() => {
-    logInfo("Offline persistence engedélyezve");
-  })
-  .catch((err) => {
-    logError("Persistence hiba", err);
-    if (err.code == 'failed-precondition') {
-      logWarn("Persistence nem elérhető - több tab nyitva");
-    } else if (err.code == 'unimplemented') {
-      logWarn("Persistence nem támogatott");
-    }
-  });
   
 // Alkalmazás inicializálása
 async function initApp() {
