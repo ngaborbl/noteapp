@@ -2,8 +2,8 @@
 import { notificationManager } from './notifications.js';
 import { createAppointmentElement, showEditAppointmentModal } from './ui-utils.js';
 
-// Az exportálást itt kell hozzáadni:
-export { initApp };
+// Exportálás a globális scope-ba
+window.initApp = initApp;
 
 // Firebase szolgáltatások elérése a globális változókon keresztül
 const db = window.fbDb;
