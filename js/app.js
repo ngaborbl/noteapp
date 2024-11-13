@@ -1,5 +1,6 @@
 // Import ES6 module szintaxissal
 import { notificationManager } from './notifications.js';
+import { createAppointmentElement, showEditAppointmentModal } from './ui-utils.js';
 
 // Firebase szolgáltatások elérése a globális változókon keresztül
 const db = window.fbDb;
@@ -1073,57 +1074,6 @@ async function setupExistingAppointmentNotifications() {
   }
 }
 
-// UI elemek létrehozása
-function createAppointmentElement(id, appointment) {
-  const li = document.createElement('li');
-  li.setAttribute('data-appointment-id', id);
-  
-  let dateString = 'Érvénytelen dátum';
-  try {
-    if (appointment.date) {
-      const date = appointment.date.toDate();
-      dateString = date.toLocaleString('hu-HU', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    }
-  } catch (error) {
-    logError('Hiba a dátum feldolgozásakor', error);
-  }
-
-  li.innerHTML = `
-    <div class="appointment-content">
-      <div class="appointment-title">
-        <strong>${appointment.title}</strong>
-      </div>
-      <div class="appointment-details">
-        <div class="appointment-date">${dateString}</div>
-        ${appointment.description ? 
-          `<div class="appointment-description">${appointment.description}</div>` : 
-          ''}
-      </div>
-      ${appointment.notifyBefore ? 
-        `<div class="appointment-notification">
-          Értesítés: ${appointment.notifyBefore} perccel előtte
-        </div>` : 
-        ''}
-    </div>
-    <div class="appointment-actions">
-      <button onclick="editAppointment('${id}')" class="edit-btn">
-        Szerkesztés
-      </button>
-      <button onclick="deleteAppointment('${id}')" class="delete-btn">
-        Törlés
-      </button>
-    </div>
-  `;
-  
-  return li;
-}
-
 // Jegyzetek oldal betöltése
 function loadNotes() {
   logDebug("Jegyzetek betöltése kezdődik");
@@ -1720,76 +1670,6 @@ function loadAppointmentsList() {
   });
 }
 
-// Időpont elem létrehozása
-function createAppointmentElement(id, appointment) {
-  const div = document.createElement('div');
-  div.className = 'appointment-card';
-  div.setAttribute('data-appointment-id', id);
-  div.setAttribute('data-date', appointment.date.toDate().toISOString());
-  
-  const now = new Date();
-  const appointmentDate = appointment.date.toDate();
-  let status = '';
-  
-  if (appointmentDate < now) {
-    status = 'past';
-  } else if (
-    appointmentDate.getDate() === now.getDate() &&
-    appointmentDate.getMonth() === now.getMonth() &&
-    appointmentDate.getFullYear() === now.getFullYear()
-  ) {
-    status = 'today';
-  }
-  
-  if (status) {
-    div.classList.add(status);
-  }
-  
-  div.innerHTML = `
-    <div class="appointment-content">
-      <h3 class="appointment-title">${appointment.title}</h3>
-      <div class="appointment-datetime">
-        <i class="calendar-icon"></i>
-        ${appointmentDate.toLocaleDateString('hu-HU', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric'
-        })}
-        <i class="time-icon"></i>
-        ${appointmentDate.toLocaleTimeString('hu-HU', {
-          hour: '2-digit',
-          minute: '2-digit'
-        })}
-      </div>
-      ${appointment.description ? `
-        <div class="appointment-description">
-          ${appointment.description}
-        </div>
-      ` : ''}
-      ${appointment.notifyBefore ? `
-        <div class="appointment-notification">
-          <i class="notification-icon"></i>
-          Értesítés ${appointment.notifyBefore} perccel előtte
-        </div>
-      ` : ''}
-    </div>
-    <div class="appointment-actions">
-      <button onclick="editAppointment('${id}')" 
-              class="edit-button" 
-              title="Szerkesztés">
-        <i class="edit-icon"></i>
-      </button>
-      <button onclick="deleteAppointment('${id}')" 
-              class="delete-button"
-              title="Törlés">
-        <i class="delete-icon"></i>
-      </button>
-    </div>
-  `;
-  
-  return div;
-}
-
 // Időpont szerkesztő modál megjelenítése
 async function showEditAppointmentModal(appointmentId, appointment) {
   const appointmentDate = appointment.date.toDate();
@@ -1928,6 +1808,7 @@ async function editAppointment(appointmentId) {
     alert('Nem sikerült betölteni az időpontot');
   }
 }
+
 
 // Időpont törlése
 async function deleteAppointment(appointmentId) {

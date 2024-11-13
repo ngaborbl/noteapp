@@ -17,17 +17,23 @@ const initializeFirebase = async () => {
 
     // Persistence beállítása
     const db = firebase.firestore();
-    await db.enablePersistence({
-      synchronizeTabs: true
-    }).catch((err) => {
-      if (err.code == 'failed-precondition') {
-        // Multiple tabs open, persistence can only be enabled in one tab at a time.
+    
+    // Firebase beállítások
+    const settings = {
+      cacheSizeBytes: firebase.firestore.CACHE_SIZE_UNLIMITED
+    };
+    db.settings(settings);
+
+    try {
+      await db.enableIndexedDbPersistence();
+      console.log("Offline persistence sikeresen engedélyezve");
+    } catch (err) {
+      if (err.code === 'failed-precondition') {
         console.warn("Persistence nem engedélyezhető több megnyitott tab esetén");
-      } else if (err.code == 'unimplemented') {
-        // The current browser does not support persistence
+      } else if (err.code === 'unimplemented') {
         console.warn("A böngésző nem támogatja a persistence funkciót");
       }
-    });
+    }
 
     // Globális változók beállítása
     window.fbDb = db;
@@ -42,7 +48,7 @@ const initializeFirebase = async () => {
   }
 };
 
-// Firebase inicializálása
+// Firebase inicializálása és alkalmazás indítása
 initializeFirebase().then(success => {
   if (success) {
     // Itt indíthatjuk az alkalmazást
