@@ -251,6 +251,38 @@ async function handleRegistration(e) {
   }
 }
 
+async function handleForgotPassword(e) {
+  e.preventDefault();
+  
+  const email = document.getElementById('reset-email').value;
+  
+  try {
+    await auth.sendPasswordResetEmail(email);
+    showToast('Jelszó visszaállító email elküldve', 'success');
+    showLoginForm(); // Visszatérés a bejelentkezési oldalra
+  } catch (error) {
+    logError("Hiba a jelszó visszaállításnál", error);
+    let errorMessage = 'Nem sikerült elküldeni a jelszó visszaállító emailt';
+    
+    switch(error.code) {
+      case 'auth/user-not-found':
+        errorMessage = 'Nem található felhasználó ezzel az email címmel';
+        break;
+      case 'auth/invalid-email':
+        errorMessage = 'Érvénytelen email cím';
+        break;
+      case 'auth/too-many-requests':
+        errorMessage = 'Túl sok próbálkozás. Kérjük próbálja később.';
+        break;
+    }
+    
+    const errorElement = document.getElementById('auth-error');
+    if (errorElement) {
+      errorElement.textContent = errorMessage;
+    }
+  }
+}
+
 // Kijelentkezés
 async function handleLogout() {
   logDebug("Kijelentkezés kezdeményezve");
@@ -500,6 +532,48 @@ function showModule(moduleId) {
   }
 }
 
+function initUserAvatar() {
+  const user = auth.currentUser;
+  if (!user) {
+    logWarn('Nincs bejelentkezett felhasználó az avatar inicializálásakor');
+    return;
+  }
+
+  const avatarElements = document.querySelectorAll('#user-avatar, .profile-avatar .avatar-preview');
+  if (avatarElements.length === 0) {
+    logWarn('Avatar elemek nem találhatók');
+    return;
+  }
+
+  // Felhasználói beállítások lekérése
+  db.collection('users').doc(user.uid).get()
+    .then(doc => {
+      if (!doc.exists) {
+        logWarn('Felhasználói dokumentum nem található');
+        return;
+      }
+      
+      const userData = doc.data();
+      const backgroundColor = userData.avatarColor || '#4CAF50';
+      const displayText = user.displayName ? 
+        user.displayName.charAt(0).toUpperCase() : 
+        '?';
+
+      avatarElements.forEach(element => {
+        element.style.backgroundColor = backgroundColor;
+        element.textContent = displayText;
+      });
+
+      logDebug('Avatar sikeresen inicializálva', {
+        backgroundColor,
+        displayText
+      });
+    })
+    .catch(error => {
+      logError("Hiba az avatar inicializálásakor", error);
+    });
+}
+
 // Dashboard betöltése
 function loadDashboard() {
   logDebug("Dashboard betöltése kezdődik");
@@ -631,6 +705,83 @@ function loadDashboard() {
   logDebug("Dashboard betöltése befejezve");
 }
 
+function filterDashboardItems(searchTerm) {
+  logDebug("Dashboard elemek szűrése", { searchTerm });
+
+  const notesList = document.getElementById('recent-notes-list');
+  const appointmentsList = document.getElementById('upcoming-appointments-list');
+  const filter = document.getElementById('dashboard-filter').value;
+
+  if (!notesList || !appointmentsList) {
+    logWarn('Lista elemek nem találhatók');
+    return;
+  }
+
+  const searchLower = searchTerm.toLowerCase();
+
+  // Jegyzetek szűrése
+  const notes = notesList.getElementsByTagName('li');
+  let visibleNotes = 0;
+  
+  Array.from(notes).forEach(note => {
+    if (note.classList.contains('empty-message')) return;
+    
+    const content = note.querySelector('.note-content')?.textContent.toLowerCase() || '';
+    const shouldShow = (filter === 'all' || filter === 'notes') && 
+                      content.includes(searchLower);
+    
+    if (shouldShow) visibleNotes++;
+    note.style.display = shouldShow ? '' : 'none';
+  });
+
+  // Időpontok szűrése
+  const appointments = appointmentsList.getElementsByTagName('li');
+  let visibleAppointments = 0;
+  
+  Array.from(appointments).forEach(appointment => {
+    if (appointment.classList.contains('empty-message')) return;
+    
+    const title = appointment.querySelector('.appointment-title')?.textContent.toLowerCase() || '';
+    const description = appointment.querySelector('.appointment-description')?.textContent.toLowerCase() || '';
+    const shouldShow = (filter === 'all' || filter === 'appointments') && 
+                      (title.includes(searchLower) || description.includes(searchLower));
+    
+    if (shouldShow) visibleAppointments++;
+    appointment.style.display = shouldShow ? '' : 'none';
+  });
+
+  // "Nincs találat" üzenetek kezelése
+  updateEmptyState(notesList, visibleNotes, 'Jegyzetek');
+  updateEmptyState(appointmentsList, visibleAppointments, 'Időpontok');
+
+  logDebug('Szűrés eredménye', {
+    visibleNotes,
+    visibleAppointments,
+    filter
+  });
+}
+
+// Segédfüggvény az üres állapot kezeléséhez
+function updateEmptyState(container, visibleCount, type) {
+  const existingEmpty = container.querySelector('.empty-message');
+  
+  if (visibleCount === 0) {
+    if (!existingEmpty) {
+      const emptyMessage = document.createElement('li');
+      emptyMessage.className = 'empty-message';
+      emptyMessage.innerHTML = `
+        <div class="empty-state">
+          <img src="/icons/search-empty.png" alt="Nincs találat">
+          <p>Nincs találat a ${type.toLowerCase()} között</p>
+        </div>
+      `;
+      container.appendChild(emptyMessage);
+    }
+  } else if (existingEmpty) {
+    existingEmpty.remove();
+  }
+}
+
 // Dashboard események kezelése
 function setupDashboardEvents() {
   logDebug("Dashboard események beállítása kezdődik");
@@ -645,7 +796,6 @@ function setupDashboardEvents() {
       const searchTerm = e.target.value.toLowerCase();
       
       searchTimeout = setTimeout(() => {
-        logDebug("Keresés kezdeményezve", { searchTerm });
         filterDashboardItems(searchTerm);
       }, 300);
     });
@@ -655,7 +805,7 @@ function setupDashboardEvents() {
   const filterSelect = document.getElementById('dashboard-filter');
   if (filterSelect) {
     filterSelect.addEventListener('change', () => {
-      const searchTerm = document.getElementById('dashboard-search').value.toLowerCase();
+      const searchTerm = searchInput.value.toLowerCase();
       logDebug("Szűrő változott", { 
         filter: filterSelect.value,
         searchTerm 
@@ -974,5 +1124,1695 @@ function createAppointmentElement(id, appointment) {
   return li;
 }
 
+// Jegyzetek oldal betöltése
+function loadNotes() {
+  logDebug("Jegyzetek betöltése kezdődik");
+  
+  const contentElement = document.getElementById('content');
+  contentElement.innerHTML = `
+    <div class="notes-container">
+      <div class="section-header">
+        <h2>Jegyzetek</h2>
+        <div class="header-controls">
+          <div class="search-box">
+            <input type="text" 
+                   id="notes-search" 
+                   placeholder="Keresés a jegyzetekben..."
+                   autocomplete="off">
+            <button class="clear-search" id="notes-clear-search">×</button>
+          </div>
+          <select id="notes-filter">
+            <option value="all">Minden jegyzet</option>
+            <option value="recent">Mai jegyzetek</option>
+            <option value="important">Fontos jegyzetek</option>
+          </select>
+        </div>
+      </div>
 
+      <form id="new-note-form" class="note-form">
+        <div class="form-group">
+          <textarea id="note-content" 
+                    placeholder="Új jegyzet írása..." 
+                    required></textarea>
+        </div>
+        <div class="form-controls">
+          <label class="checkbox-container">
+            <input type="checkbox" id="note-important">
+            <span class="checkbox-label">Fontos</span>
+          </label>
+          <button type="submit" class="primary-button">
+            Jegyzet mentése
+          </button>
+        </div>
+      </form>
 
+      <div id="notes-list" class="notes-grid"></div>
+    </div>
+  `;
+
+  // Eseménykezelők beállítása
+  setupNotesEventHandlers();
+  
+  // Jegyzetek betöltése
+  loadNotesList();
+  
+  logDebug("Jegyzetek oldal betöltve");
+}
+
+// Jegyzetek eseménykezelők beállítása
+function setupNotesEventHandlers() {
+  // Új jegyzet form
+  document.getElementById('new-note-form').addEventListener('submit', handleNewNote);
+  
+  // Keresés
+  const searchInput = document.getElementById('notes-search');
+  let searchTimeout;
+  
+  searchInput.addEventListener('input', (e) => {
+    clearTimeout(searchTimeout);
+    const searchTerm = e.target.value.toLowerCase();
+    
+    searchTimeout = setTimeout(() => {
+      logDebug("Jegyzetek keresés", { searchTerm });
+      filterNotes(searchTerm);
+    }, 300);
+  });
+
+  // Keresés törlése
+  document.getElementById('notes-clear-search').addEventListener('click', () => {
+    searchInput.value = '';
+    filterNotes('');
+  });
+
+  // Szűrés
+  document.getElementById('notes-filter').addEventListener('change', (e) => {
+    const filter = e.target.value;
+    const searchTerm = searchInput.value.toLowerCase();
+    logDebug("Jegyzetek szűrő változott", { filter, searchTerm });
+    filterNotes(searchTerm, filter);
+  });
+}
+
+// Új jegyzet hozzáadása
+async function handleNewNote(e) {
+  e.preventDefault();
+  
+  const content = document.getElementById('note-content').value.trim();
+  const isImportant = document.getElementById('note-important').checked;
+  
+  if (!content) return;
+  
+  logDebug("Új jegyzet létrehozása", { content, isImportant });
+  
+  try {
+    const noteData = {
+      content,
+      isImportant,
+      timestamp: window.fbDb.Timestamp.now(),
+      lastModified: window.fbDb.Timestamp.now(),
+      userId: auth.currentUser.uid
+    };
+    
+    await db.collection('notes').add(noteData);
+    
+    // Form tisztítása
+    document.getElementById('note-content').value = '';
+    document.getElementById('note-important').checked = false;
+    
+    logInfo("Jegyzet sikeresen létrehozva");
+  } catch (error) {
+    logError("Hiba a jegyzet létrehozásakor", error);
+    alert('Nem sikerült létrehozni a jegyzetet');
+  }
+}
+
+// Jegyzetek lista betöltése
+function loadNotesList() {
+  const notesList = document.getElementById('notes-list');
+  
+  if (!notesList) {
+    logWarn('Jegyzetek lista elem nem található');
+    return;
+  }
+
+  if (window.notesUnsubscribe) {
+    window.notesUnsubscribe();
+  }
+
+  // Lekérdezés csak a felhasználó jegyzetei
+  const query = db.collection('notes')
+    .where('userId', '==', auth.currentUser.uid)
+    .orderBy('timestamp', 'desc');
+
+  window.notesUnsubscribe = query.onSnapshot((snapshot) => {
+    const changes = snapshot.docChanges();
+    
+    changes.forEach(change => {
+      const note = change.doc.data();
+      const noteId = change.doc.id;
+      
+      if (change.type === 'added') {
+        const noteElement = createNoteElement(noteId, note);
+        notesList.insertBefore(noteElement, notesList.firstChild);
+      }
+      else if (change.type === 'modified') {
+        const existingNote = document.querySelector(`[data-note-id="${noteId}"]`);
+        if (existingNote) {
+          const noteElement = createNoteElement(noteId, note);
+          existingNote.replaceWith(noteElement);
+        }
+      }
+      else if (change.type === 'removed') {
+        const existingNote = document.querySelector(`[data-note-id="${noteId}"]`);
+        if (existingNote) {
+          existingNote.remove();
+        }
+      }
+    });
+
+    if (snapshot.empty) {
+      notesList.innerHTML = `
+        <div class="empty-state">
+          <img src="/icons/notes-empty.png" alt="Nincs jegyzet">
+          <p>Még nincsenek jegyzetek</p>
+        </div>
+      `;
+    }
+    
+    logDebug('Jegyzetek lista frissítve', { 
+      changes: changes.map(c => c.type) 
+    });
+  }, error => {
+    logError('Hiba a jegyzetek betöltésekor', error);
+    notesList.innerHTML = `
+      <div class="error-state">
+        <p>Hiba történt a jegyzetek betöltésekor</p>
+        <button onclick="loadNotesList()">Újrapróbálkozás</button>
+      </div>
+    `;
+  });
+}
+
+// Jegyzet elem létrehozása
+function createNoteElement(id, note) {
+  const div = document.createElement('div');
+  div.className = `note-card ${note.isImportant ? 'important' : ''}`;
+  div.setAttribute('data-note-id', id);
+  
+  div.innerHTML = `
+    <div class="note-content">
+      <p>${note.content}</p>
+    </div>
+    <div class="note-meta">
+      <span class="note-date">
+        ${note.timestamp.toDate().toLocaleString('hu-HU')}
+      </span>
+      ${note.isImportant ? 
+        '<span class="note-badge important">Fontos</span>' : 
+        ''}
+    </div>
+    <div class="note-actions">
+      <button onclick="editNote('${id}')" class="edit-button">
+        <i class="edit-icon"></i>
+      </button>
+      <button onclick="deleteNote('${id}')" class="delete-button">
+        <i class="delete-icon"></i>
+      </button>
+    </div>
+  `;
+  
+  return div;
+}
+
+// Jegyzet szerkesztése
+async function editNote(noteId) {
+  logDebug("Jegyzet szerkesztése", { noteId });
+  
+  try {
+    const doc = await db.collection('notes').doc(noteId).get();
+    if (!doc.exists) {
+      throw new Error('Jegyzet nem található');
+    }
+    
+    const note = doc.data();
+    
+    // Szerkesztő modál megjelenítése
+    showModal({
+      title: 'Jegyzet szerkesztése',
+      content: `
+        <form id="edit-note-form" class="note-form">
+          <div class="form-group">
+            <textarea id="edit-note-content" required>${note.content}</textarea>
+          </div>
+          <div class="form-controls">
+            <label class="checkbox-container">
+              <input type="checkbox" id="edit-note-important" 
+                     ${note.isImportant ? 'checked' : ''}>
+              <span class="checkbox-label">Fontos</span>
+            </label>
+          </div>
+        </form>
+      `,
+      buttons: [
+        {
+          text: 'Mentés',
+          type: 'primary',
+          onClick: async () => {
+            const content = document.getElementById('edit-note-content').value.trim();
+            const isImportant = document.getElementById('edit-note-important').checked;
+            
+            if (!content) return;
+            
+            try {
+              await db.collection('notes').doc(noteId).update({
+                content,
+                isImportant,
+                lastModified: window.fbDb.Timestamp.now()
+              });
+              
+              logInfo("Jegyzet sikeresen frissítve");
+              hideModal();
+            } catch (error) {
+              logError("Hiba a jegyzet frissítésekor", error);
+              alert('Nem sikerült frissíteni a jegyzetet');
+            }
+          }
+        },
+        {
+          text: 'Mégse',
+          type: 'secondary',
+          onClick: hideModal
+        }
+      ]
+    });
+    
+  } catch (error) {
+    logError("Hiba a jegyzet szerkesztésekor", error);
+    alert('Nem sikerült betölteni a jegyzetet');
+  }
+}
+
+// Jegyzet törlése
+async function deleteNote(noteId) {
+  logDebug("Jegyzet törlése", { noteId });
+  
+  if (!confirm('Biztosan törölni szeretnéd ezt a jegyzetet?')) {
+    return;
+  }
+  
+  try {
+    await db.collection('notes').doc(noteId).delete();
+    logInfo("Jegyzet sikeresen törölve");
+  } catch (error) {
+    logError("Hiba a jegyzet törlésekor", error);
+    alert('Nem sikerült törölni a jegyzetet');
+  }
+}
+
+// Jegyzetek szűrése
+function filterNotes(searchTerm, filter = 'all') {
+  const notes = document.querySelectorAll('.note-card');
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  notes.forEach(note => {
+    const content = note.querySelector('.note-content').textContent.toLowerCase();
+    const timestamp = new Date(note.querySelector('.note-date').textContent);
+    const isImportant = note.classList.contains('important');
+    
+    let visible = content.includes(searchTerm);
+    
+    if (visible && filter !== 'all') {
+      switch(filter) {
+        case 'recent':
+          visible = timestamp >= today;
+          break;
+        case 'important':
+          visible = isImportant;
+          break;
+      }
+    }
+    
+    note.style.display = visible ? '' : 'none';
+  });
+}
+
+// Időpontok oldal betöltése
+function loadAppointments() {
+  logDebug("Időpontok oldal betöltése kezdődik");
+  
+  const contentElement = document.getElementById('content');
+  contentElement.innerHTML = `
+    <div class="appointments-container">
+      <div class="section-header">
+        <h2>Időpontok</h2>
+        <div class="header-controls">
+          <div class="search-box">
+            <input type="text" 
+                   id="appointments-search" 
+                   placeholder="Keresés az időpontok között..."
+                   autocomplete="off">
+            <button class="clear-search" id="appointments-clear-search">×</button>
+          </div>
+          <select id="appointments-filter">
+            <option value="all">Minden időpont</option>
+            <option value="upcoming">Közelgő</option>
+            <option value="today">Mai</option>
+            <option value="past">Korábbi</option>
+          </select>
+        </div>
+      </div>
+
+      <form id="new-appointment-form" class="appointment-form">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="appointment-title">Megnevezés</label>
+            <input type="text" 
+                   id="appointment-title" 
+                   placeholder="Időpont megnevezése"
+                   required>
+          </div>
+          <div class="form-group">
+            <label for="appointment-date">Dátum</label>
+            <input type="date" 
+                   id="appointment-date"
+                   min="${new Date().toISOString().split('T')[0]}"
+                   required>
+          </div>
+          <div class="form-group">
+            <label for="appointment-time">Időpont</label>
+            <input type="time" 
+                   id="appointment-time"
+                   required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="appointment-description">Leírás</label>
+            <textarea id="appointment-description" 
+                      placeholder="Időpont részletei (opcionális)"></textarea>
+          </div>
+          <div class="form-group">
+            <label for="appointment-notify">Értesítés</label>
+            <select id="appointment-notify">
+              <option value="10">10 perccel előtte</option>
+              <option value="30">30 perccel előtte</option>
+              <option value="60">1 órával előtte</option>
+              <option value="1440">1 nappal előtte</option>
+              <option value="0">Nincs értesítés</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-controls">
+          <button type="submit" class="primary-button">
+            Időpont mentése
+          </button>
+        </div>
+      </form>
+
+      <div id="appointments-list" class="appointments-grid"></div>
+    </div>
+  `;
+
+  // Eseménykezelők beállítása
+  setupAppointmentsEventHandlers();
+  
+  // Időpontok betöltése
+  loadAppointmentsList();
+  
+  logDebug("Időpontok oldal betöltve");
+}
+
+// Időpontok eseménykezelők beállítása
+function setupAppointmentsEventHandlers() {
+  // Új időpont form
+  document.getElementById('new-appointment-form')
+    .addEventListener('submit', handleNewAppointment);
+  
+  // Keresés
+  const searchInput = document.getElementById('appointments-search');
+  let searchTimeout;
+  
+  searchInput.addEventListener('input', (e) => {
+    clearTimeout(searchTimeout);
+    const searchTerm = e.target.value.toLowerCase();
+    
+    searchTimeout = setTimeout(() => {
+      logDebug("Időpontok keresés", { searchTerm });
+      filterAppointments(searchTerm);
+    }, 300);
+  });
+
+  // Keresés törlése
+  document.getElementById('appointments-clear-search').addEventListener('click', () => {
+    searchInput.value = '';
+    filterAppointments('');
+  });
+
+  // Szűrés
+  document.getElementById('appointments-filter').addEventListener('change', (e) => {
+    const filter = e.target.value;
+    const searchTerm = searchInput.value.toLowerCase();
+    logDebug("Időpontok szűrő változott", { filter, searchTerm });
+    filterAppointments(searchTerm, filter);
+  });
+
+  // Minimum dátum beállítása
+  const dateInput = document.getElementById('appointment-date');
+  const today = new Date().toISOString().split('T')[0];
+  dateInput.min = today;
+  dateInput.value = today;
+}
+
+// Új időpont hozzáadása
+async function handleNewAppointment(e) {
+  e.preventDefault();
+  
+  const title = document.getElementById('appointment-title').value.trim();
+  const date = document.getElementById('appointment-date').value;
+  const time = document.getElementById('appointment-time').value;
+  const description = document.getElementById('appointment-description').value.trim();
+  const notifyBefore = parseInt(document.getElementById('appointment-notify').value);
+  
+  if (!title || !date || !time) return;
+  
+  try {
+    const dateTime = new Date(`${date}T${time}`);
+    if (isNaN(dateTime.getTime())) {
+      throw new Error('Érvénytelen dátum vagy idő');
+    }
+
+    logDebug("Új időpont létrehozása", { 
+      title, 
+      dateTime, 
+      notifyBefore 
+    });
+    
+    const appointmentData = {
+      title,
+      description,
+      date: window.fbDb.Timestamp.fromDate(dateTime),
+      notifyBefore,
+      timestamp: window.fbDb.Timestamp.now(),
+      userId: auth.currentUser.uid
+    };
+    
+    const docRef = await db.collection('appointments').add(appointmentData);
+    
+    // Értesítés beállítása
+    if (notifyBefore > 0) {
+      await notificationManager.scheduleAppointmentNotification({
+        id: docRef.id,
+        ...appointmentData
+      });
+    }
+    
+    // Form tisztítása
+    e.target.reset();
+    document.getElementById('appointment-date').value = new Date().toISOString().split('T')[0];
+    
+    logInfo("Időpont sikeresen létrehozva", { id: docRef.id });
+  } catch (error) {
+    logError("Hiba az időpont létrehozásakor", error);
+    alert('Nem sikerült létrehozni az időpontot');
+  }
+}
+
+// Időpontok lista betöltése
+function loadAppointmentsList() {
+  const appointmentsList = document.getElementById('appointments-list');
+  
+  if (!appointmentsList) {
+    logWarn('Időpontok lista elem nem található');
+    return;
+  }
+
+  if (window.appointmentsUnsubscribe) {
+    window.appointmentsUnsubscribe();
+  }
+
+  // Lekérdezés csak a felhasználó időpontjai
+  const query = db.collection('appointments')
+    .where('userId', '==', auth.currentUser.uid)
+    .orderBy('date', 'asc');
+
+  window.appointmentsUnsubscribe = query.onSnapshot((snapshot) => {
+    const changes = snapshot.docChanges();
+    
+    changes.forEach(change => {
+      const appointment = change.doc.data();
+      const appointmentId = change.doc.id;
+      
+      if (change.type === 'added') {
+        const appointmentElement = createAppointmentElement(appointmentId, appointment);
+        
+        // Beszúrás időrendi sorrendben
+        let inserted = false;
+        const existingAppointments = appointmentsList.children;
+        for (let i = 0; i < existingAppointments.length; i++) {
+          const existing = existingAppointments[i];
+          const existingDate = existing.getAttribute('data-date');
+          if (existingDate && appointment.date.toDate() < new Date(existingDate)) {
+            appointmentsList.insertBefore(appointmentElement, existing);
+            inserted = true;
+            break;
+          }
+        }
+        if (!inserted) {
+          appointmentsList.appendChild(appointmentElement);
+        }
+      }
+      else if (change.type === 'modified') {
+        const existingAppointment = document.querySelector(`[data-appointment-id="${appointmentId}"]`);
+        if (existingAppointment) {
+          const appointmentElement = createAppointmentElement(appointmentId, appointment);
+          existingAppointment.replaceWith(appointmentElement);
+        }
+      }
+      else if (change.type === 'removed') {
+        const existingAppointment = document.querySelector(`[data-appointment-id="${appointmentId}"]`);
+        if (existingAppointment) {
+          existingAppointment.remove();
+        }
+      }
+    });
+
+    if (snapshot.empty) {
+      appointmentsList.innerHTML = `
+        <div class="empty-state">
+          <img src="/icons/calendar-empty.png" alt="Nincs időpont">
+          <p>Még nincsenek időpontok</p>
+        </div>
+      `;
+    }
+    
+    logDebug('Időpontok lista frissítve', { 
+      changes: changes.map(c => c.type) 
+    });
+  }, error => {
+    logError('Hiba az időpontok betöltésekor', error);
+    appointmentsList.innerHTML = `
+      <div class="error-state">
+        <p>Hiba történt az időpontok betöltésekor</p>
+        <button onclick="loadAppointmentsList()">Újrapróbálkozás</button>
+      </div>
+    `;
+  });
+}
+
+// Időpont elem létrehozása
+function createAppointmentElement(id, appointment) {
+  const div = document.createElement('div');
+  div.className = 'appointment-card';
+  div.setAttribute('data-appointment-id', id);
+  div.setAttribute('data-date', appointment.date.toDate().toISOString());
+  
+  const now = new Date();
+  const appointmentDate = appointment.date.toDate();
+  let status = '';
+  
+  if (appointmentDate < now) {
+    status = 'past';
+  } else if (
+    appointmentDate.getDate() === now.getDate() &&
+    appointmentDate.getMonth() === now.getMonth() &&
+    appointmentDate.getFullYear() === now.getFullYear()
+  ) {
+    status = 'today';
+  }
+  
+  if (status) {
+    div.classList.add(status);
+  }
+  
+  div.innerHTML = `
+    <div class="appointment-content">
+      <h3 class="appointment-title">${appointment.title}</h3>
+      <div class="appointment-datetime">
+        <i class="calendar-icon"></i>
+        ${appointmentDate.toLocaleDateString('hu-HU', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        })}
+        <i class="time-icon"></i>
+        ${appointmentDate.toLocaleTimeString('hu-HU', {
+          hour: '2-digit',
+          minute: '2-digit'
+        })}
+      </div>
+      ${appointment.description ? `
+        <div class="appointment-description">
+          ${appointment.description}
+        </div>
+      ` : ''}
+      ${appointment.notifyBefore ? `
+        <div class="appointment-notification">
+          <i class="notification-icon"></i>
+          Értesítés ${appointment.notifyBefore} perccel előtte
+        </div>
+      ` : ''}
+    </div>
+    <div class="appointment-actions">
+      <button onclick="editAppointment('${id}')" 
+              class="edit-button" 
+              title="Szerkesztés">
+        <i class="edit-icon"></i>
+      </button>
+      <button onclick="deleteAppointment('${id}')" 
+              class="delete-button"
+              title="Törlés">
+        <i class="delete-icon"></i>
+      </button>
+    </div>
+  `;
+  
+  return div;
+}
+
+// Időpont szerkesztése
+async function editAppointment(appointmentId) {
+  logDebug("Időpont szerkesztése", { appointmentId });
+  
+  try {
+    const doc = await db.collection('appointments').doc(appointmentId).get();
+    if (!doc.exists) {
+      throw new Error('Időpont nem található');
+    }
+    
+    const appointment = doc.data();
+    const appointmentDate = appointment.date.toDate();
+    const dateString = appointmentDate.toISOString().split('T')[0];
+    const timeString = appointmentDate.toTimeString().slice(0, 5);
+    
+    // Szerkesztő modál megjelenítése
+async function showEditAppointmentModal(appointmentId, appointment) {
+  const appointmentDate = appointment.date.toDate();
+  const dateString = appointmentDate.toISOString().split('T')[0];
+  const timeString = appointmentDate.toTimeString().slice(0, 5);
+
+  const modalContent = `
+    <form id="edit-appointment-form" class="appointment-form">
+      <div class="form-row">
+        <div class="form-group">
+          <label for="edit-appointment-title">Megnevezés</label>
+          <input type="text" 
+                 id="edit-appointment-title" 
+                 value="${appointment.title}"
+                 required>
+        </div>
+        <div class="form-group">
+          <label for="edit-appointment-date">Dátum</label>
+          <input type="date" 
+                 id="edit-appointment-date"
+                 value="${dateString}"
+                 min="${new Date().toISOString().split('T')[0]}"
+                 required>
+        </div>
+        <div class="form-group">
+          <label for="edit-appointment-time">Időpont</label>
+          <input type="time" 
+                 id="edit-appointment-time"
+                 value="${timeString}"
+                 required>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="edit-appointment-description">Leírás</label>
+          <textarea id="edit-appointment-description">${appointment.description || ''}</textarea>
+        </div>
+        <div class="form-group">
+          <label for="edit-appointment-notify">Értesítés</label>
+          <select id="edit-appointment-notify">
+            <option value="10" ${appointment.notifyBefore === 10 ? 'selected' : ''}>
+              10 perccel előtte
+            </option>
+            <option value="30" ${appointment.notifyBefore === 30 ? 'selected' : ''}>
+              30 perccel előtte
+            </option>
+            <option value="60" ${appointment.notifyBefore === 60 ? 'selected' : ''}>
+              1 órával előtte
+            </option>
+            <option value="1440" ${appointment.notifyBefore === 1440 ? 'selected' : ''}>
+              1 nappal előtte
+            </option>
+            <option value="0" ${!appointment.notifyBefore ? 'selected' : ''}>
+              Nincs értesítés
+            </option>
+          </select>
+        </div>
+      </div>
+    </form>
+  `;
+
+  showModal({
+    title: 'Időpont szerkesztése',
+    content: modalContent,
+    buttons: [
+      {
+        text: 'Mentés',
+        type: 'primary',
+        onClick: async () => {
+          const title = document.getElementById('edit-appointment-title').value.trim();
+          const date = document.getElementById('edit-appointment-date').value;
+          const time = document.getElementById('edit-appointment-time').value;
+          const description = document.getElementById('edit-appointment-description').value.trim();
+          const notifyBefore = parseInt(document.getElementById('edit-appointment-notify').value);
+
+          if (!title || !date || !time) return;
+
+          try {
+            const dateTime = new Date(`${date}T${time}`);
+            if (isNaN(dateTime.getTime())) {
+              throw new Error('Érvénytelen dátum vagy idő');
+            }
+
+            const updatedData = {
+              title,
+              description,
+              date: window.fbDb.Timestamp.fromDate(dateTime),
+              notifyBefore,
+              lastModified: window.fbDb.Timestamp.now()
+            };
+
+            await db.collection('appointments').doc(appointmentId).update(updatedData);
+
+            // Értesítés frissítése
+            if (notifyBefore > 0) {
+              await notificationManager.updateAppointmentNotification({
+                id: appointmentId,
+                ...updatedData
+              });
+            } else {
+              await notificationManager.cancelNotification(appointmentId);
+            }
+
+            hideModal();
+            logInfo("Időpont sikeresen frissítve", { appointmentId });
+          } catch (error) {
+            logError("Hiba az időpont frissítésekor", error);
+            alert('Nem sikerült frissíteni az időpontot');
+          }
+        }
+      },
+      {
+        text: 'Mégse',
+        type: 'secondary',
+        onClick: hideModal
+      }
+    ]
+  });
+}
+
+// Időpont törlése
+async function deleteAppointment(appointmentId) {
+  logDebug("Időpont törlése", { appointmentId });
+  
+  showConfirmModal({
+    title: 'Időpont törlése',
+    message: 'Biztosan törölni szeretnéd ezt az időpontot?',
+    onConfirm: async () => {
+      try {
+        await db.collection('appointments').doc(appointmentId).delete();
+        await notificationManager.cancelNotification(appointmentId);
+        logInfo("Időpont sikeresen törölve", { appointmentId });
+      } catch (error) {
+        logError("Hiba az időpont törlésekor", error);
+        alert('Nem sikerült törölni az időpontot');
+      }
+    }
+  });
+}
+
+// Időpontok szűrése
+function filterAppointments(searchTerm, filter = 'all') {
+  const appointments = document.querySelectorAll('.appointment-card');
+  const now = new Date();
+  
+  appointments.forEach(appointment => {
+    const title = appointment.querySelector('.appointment-title').textContent.toLowerCase();
+    const description = appointment.querySelector('.appointment-description')?.textContent.toLowerCase() || '';
+    const dateStr = appointment.getAttribute('data-date');
+    const date = new Date(dateStr);
+    
+    // Keresési feltétel
+    let visible = title.includes(searchTerm) || description.includes(searchTerm);
+    
+    // Szűrési feltétel
+    if (visible && filter !== 'all') {
+      const isToday = date.toDateString() === now.toDateString();
+      const isPast = date < now;
+      
+      switch(filter) {
+        case 'upcoming':
+          visible = !isPast;
+          break;
+        case 'today':
+          visible = isToday;
+          break;
+        case 'past':
+          visible = isPast;
+          break;
+      }
+    }
+    
+    // Megjelenítés animációval
+    if (visible) {
+      appointment.classList.remove('hidden');
+      appointment.animate([
+        { opacity: 0, transform: 'translateY(20px)' },
+        { opacity: 1, transform: 'translateY(0)' }
+      ], {
+        duration: 200,
+        easing: 'ease-out'
+      });
+    } else {
+      appointment.classList.add('hidden');
+    }
+  });
+
+  // "Nincs találat" üzenet kezelése
+  const appointmentsList = document.getElementById('appointments-list');
+  const visibleAppointments = appointmentsList.querySelectorAll('.appointment-card:not(.hidden)');
+  
+  if (visibleAppointments.length === 0) {
+    const emptyMessage = document.createElement('div');
+    emptyMessage.className = 'empty-state';
+    emptyMessage.innerHTML = `
+      <img src="/icons/search-empty.png" alt="Nincs találat">
+      <p>Nincs a keresésnek megfelelő időpont</p>
+    `;
+    appointmentsList.appendChild(emptyMessage);
+  } else {
+    const emptyMessage = appointmentsList.querySelector('.empty-state');
+    if (emptyMessage) {
+      emptyMessage.remove();
+    }
+  }
+}
+
+// Segéd funkciók modálokhoz
+function showModal({ title, content, buttons }) {
+  const modalContainer = document.createElement('div');
+  modalContainer.className = 'modal-container';
+  
+  modalContainer.innerHTML = `
+    <div class="modal">
+      <div class="modal-header">
+        <h3>${title}</h3>
+        <button class="modal-close">&times;</button>
+      </div>
+      <div class="modal-content">
+        ${content}
+      </div>
+      <div class="modal-footer">
+        ${buttons.map(button => `
+          <button class="button ${button.type}">${button.text}</button>
+        `).join('')}
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(modalContainer);
+  
+  // Események kezelése
+  const modal = modalContainer.querySelector('.modal');
+  const closeButton = modal.querySelector('.modal-close');
+  const footerButtons = modal.querySelectorAll('.modal-footer button');
+  
+  closeButton.addEventListener('click', hideModal);
+  
+  footerButtons.forEach((button, index) => {
+    button.addEventListener('click', buttons[index].onClick);
+  });
+  
+  // Animáció
+  requestAnimationFrame(() => {
+    modalContainer.classList.add('visible');
+    modal.classList.add('visible');
+  });
+}
+
+function hideModal() {
+  const modalContainer = document.querySelector('.modal-container');
+  if (modalContainer) {
+    const modal = modalContainer.querySelector('.modal');
+    modalContainer.classList.remove('visible');
+    modal.classList.remove('visible');
+    
+    setTimeout(() => {
+      modalContainer.remove();
+    }, 300);
+  }
+}
+
+function showConfirmModal({ title, message, onConfirm }) {
+  showModal({
+    title,
+    content: `<p class="confirm-message">${message}</p>`,
+    buttons: [
+      {
+        text: 'Igen',
+        type: 'danger',
+        onClick: () => {
+          onConfirm();
+          hideModal();
+        }
+      },
+      {
+        text: 'Nem',
+        type: 'secondary',
+        onClick: hideModal
+      }
+    ]
+  });
+}
+
+// Beállítások oldal betöltése
+function loadSettings() {
+  logDebug("Beállítások oldal betöltése kezdődik");
+  
+  const contentElement = document.getElementById('content');
+  contentElement.innerHTML = `
+    <div class="settings-container">
+      <div class="section-header">
+        <h2>Beállítások</h2>
+      </div>
+
+      <form id="settings-form" class="settings-form">
+        <div class="settings-group">
+          <h3>Megjelenés</h3>
+          <div class="form-group">
+            <label for="theme-select">Téma</label>
+            <select id="theme-select" name="theme">
+              <option value="light">Világos</option>
+              <option value="dark">Sötét</option>
+              <option value="system">Rendszer beállítás követése</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="font-size">Betűméret</label>
+            <select id="font-size" name="fontSize">
+              <option value="small">Kicsi</option>
+              <option value="medium">Közepes</option>
+              <option value="large">Nagy</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <h3>Értesítések</h3>
+          <div class="form-group">
+            <label for="notifications-enabled">
+              <input type="checkbox" 
+                     id="notifications-enabled" 
+                     name="notificationsEnabled">
+              Értesítések engedélyezése
+            </label>
+          </div>
+          <div class="form-group" id="notification-settings" style="display: none;">
+            <label for="default-notify-time">Alapértelmezett értesítési idő</label>
+            <select id="default-notify-time" name="defaultNotifyTime">
+              <option value="10">10 perccel előtte</option>
+              <option value="30">30 perccel előtte</option>
+              <option value="60">1 órával előtte</option>
+              <option value="1440">1 nappal előtte</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <h3>Adatok és biztonság</h3>
+          <div class="form-group">
+            <label for="data-sync">
+              <input type="checkbox" 
+                     id="data-sync" 
+                     name="dataSync">
+              Offline adatok szinkronizálása
+            </label>
+          </div>
+          <div class="form-group">
+            <label for="auto-logout">Automatikus kijelentkezés</label>
+            <select id="auto-logout" name="autoLogout">
+              <option value="0">Soha</option>
+              <option value="15">15 perc inaktivitás után</option>
+              <option value="30">30 perc inaktivitás után</option>
+              <option value="60">1 óra inaktivitás után</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <h3>Fejlesztői beállítások</h3>
+          <div class="form-group">
+            <label for="debug-mode">
+              <input type="checkbox" 
+                     id="debug-mode" 
+                     name="debugMode">
+              Debug mód engedélyezése
+            </label>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="primary-button">
+            Beállítások mentése
+          </button>
+          <button type="button" 
+                  onclick="resetSettings()" 
+                  class="secondary-button">
+            Alapértelmezett beállítások
+          </button>
+        </div>
+      </form>
+    </div>
+  `;
+
+  // Beállítások betöltése és form kitöltése
+  loadUserSettings();
+  
+  // Események kezelése
+  setupSettingsEventHandlers();
+  
+  logDebug("Beállítások oldal betöltve");
+}
+
+// Beállítások eseménykezelők
+function setupSettingsEventHandlers() {
+  const form = document.getElementById('settings-form');
+  const notificationsEnabled = document.getElementById('notifications-enabled');
+  const notificationSettings = document.getElementById('notification-settings');
+
+  // Értesítések beállítások megjelenítése
+  notificationsEnabled.addEventListener('change', (e) => {
+    notificationSettings.style.display = e.target.checked ? 'block' : 'none';
+    
+    if (e.target.checked && Notification.permission !== 'granted') {
+      notificationManager.requestPermission();
+    }
+  });
+
+  // Form mentése
+  form.addEventListener('submit', handleSettingsSave);
+
+  // Téma azonnal alkalmazása változtatáskor
+  document.getElementById('theme-select').addEventListener('change', (e) => {
+    applyTheme(e.target.value);
+  });
+
+  // Betűméret azonnal alkalmazása
+  document.getElementById('font-size').addEventListener('change', (e) => {
+    document.documentElement.setAttribute('data-font-size', e.target.value);
+  });
+
+  // Debug mód azonnal alkalmazása
+  document.getElementById('debug-mode').addEventListener('change', (e) => {
+    setDebugMode(e.target.checked);
+  });
+}
+
+// Felhasználói beállítások betöltése
+async function loadUserSettings() {
+  try {
+    const userId = auth.currentUser.uid;
+    const doc = await db.collection('users').doc(userId).get();
+    
+    if (!doc.exists) {
+      throw new Error('Felhasználói beállítások nem találhatók');
+    }
+
+    const settings = doc.data();
+    logDebug("Felhasználói beállítások betöltve", settings);
+
+    // Form mezők kitöltése
+    document.getElementById('theme-select').value = settings.theme || 'light';
+    document.getElementById('font-size').value = settings.fontSize || 'medium';
+    document.getElementById('notifications-enabled').checked = settings.notificationsEnabled || false;
+    document.getElementById('default-notify-time').value = settings.defaultNotifyTime || '10';
+    document.getElementById('data-sync').checked = settings.dataSync || false;
+    document.getElementById('auto-logout').value = settings.autoLogout || '0';
+    document.getElementById('debug-mode').checked = settings.debugMode || false;
+
+    // Beállítások alkalmazása
+    applyTheme(settings.theme);
+    document.documentElement.setAttribute('data-font-size', settings.fontSize);
+    setDebugMode(settings.debugMode);
+
+    // Értesítések beállítások megjelenítése
+    const notificationSettings = document.getElementById('notification-settings');
+    notificationSettings.style.display = settings.notificationsEnabled ? 'block' : 'none';
+
+  } catch (error) {
+    logError("Hiba a beállítások betöltésekor", error);
+    alert('Nem sikerült betölteni a beállításokat');
+  }
+}
+
+// Beállítások mentése
+async function handleSettingsSave(e) {
+  e.preventDefault();
+  
+  const form = e.target;
+  const formData = new FormData(form);
+  const settings = {
+    theme: formData.get('theme'),
+    fontSize: formData.get('fontSize'),
+    notificationsEnabled: formData.get('notificationsEnabled') === 'on',
+    defaultNotifyTime: formData.get('defaultNotifyTime'),
+    dataSync: formData.get('dataSync') === 'on',
+    autoLogout: formData.get('autoLogout'),
+    debugMode: formData.get('debugMode') === 'on',
+    lastModified: window.fbDb.Timestamp.now()
+  };
+
+  try {
+    const userId = auth.currentUser.uid;
+    await db.collection('users').doc(userId).update(settings);
+    
+    logInfo("Beállítások sikeresen mentve", settings);
+    showToast('Beállítások mentve', 'success');
+  } catch (error) {
+    logError("Hiba a beállítások mentésekor", error);
+    showToast('Nem sikerült menteni a beállításokat', 'error');
+  }
+}
+
+// Alapértelmezett beállítások visszaállítása
+async function resetSettings() {
+  if (!confirm('Biztosan visszaállítod az alapértelmezett beállításokat?')) {
+    return;
+  }
+
+  const defaultSettings = {
+    theme: 'light',
+    fontSize: 'medium',
+    notificationsEnabled: false,
+    defaultNotifyTime: '10',
+    dataSync: true,
+    autoLogout: '0',
+    debugMode: false,
+    lastModified: window.fbDb.Timestamp.now()
+  };
+
+  try {
+    const userId = auth.currentUser.uid;
+    await db.collection('users').doc(userId).update(defaultSettings);
+    
+    // Form újratöltése
+    loadUserSettings();
+    
+    logInfo("Beállítások visszaállítva az alapértelmezettre");
+    showToast('Beállítások visszaállítva', 'success');
+  } catch (error) {
+    logError("Hiba a beállítások visszaállításakor", error);
+    showToast('Nem sikerült visszaállítani a beállításokat', 'error');
+  }
+}
+
+// Profil oldal betöltése
+function loadProfile() {
+  logDebug("Profil oldal betöltése kezdődik");
+  
+  const user = auth.currentUser;
+  const contentElement = document.getElementById('content');
+  
+  contentElement.innerHTML = `
+    <div class="profile-container">
+      <div class="section-header">
+        <h2>Profil beállítások</h2>
+      </div>
+
+      <div class="profile-content">
+        <div class="profile-header">
+          <div id="profile-avatar" class="profile-avatar">
+            <div class="avatar-preview"></div>
+            <button type="button" class="change-avatar-btn">
+              <i class="camera-icon"></i>
+            </button>
+          </div>
+          <div class="profile-info">
+            <h3>${user.displayName || 'Névtelen felhasználó'}</h3>
+            <p>${user.email}</p>
+            <p class="profile-meta">
+              Regisztráció: ${new Date(user.metadata.creationTime).toLocaleDateString('hu-HU')}
+            </p>
+          </div>
+        </div>
+
+        <form id="profile-form" class="profile-form">
+          <div class="form-group">
+            <label for="display-name">Megjelenített név</label>
+            <input type="text" 
+                   id="display-name" 
+                   name="displayName"
+                   value="${user.displayName || ''}" 
+                   placeholder="Add meg a neved"
+                   required>
+          </div>
+
+          <div class="form-group">
+            <label for="avatar-color">Profilszín</label>
+            <input type="color" 
+                   id="avatar-color" 
+                   name="avatarColor"
+                   value="#4CAF50">
+          </div>
+
+          <div class="form-group">
+            <label for="email">Email cím</label>
+            <input type="email" 
+                   id="email" 
+                   value="${user.email}" 
+                   disabled>
+            <button type="button" 
+                    onclick="showChangeEmailModal()" 
+                    class="secondary-button">
+              Email cím módosítása
+            </button>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="primary-button">
+              Profil mentése
+            </button>
+            <button type="button" 
+                    onclick="showChangePasswordModal()" 
+                    class="secondary-button">
+              Jelszó módosítása
+            </button>
+          </div>
+        </form>
+
+        <div class="danger-zone">
+          <h3>Veszélyes zóna</h3>
+          <p>Az alábbi műveletek nem visszavonhatók!</p>
+          
+          <button onclick="handleAccountDelete()" 
+                  class="danger-button">
+            Fiók törlése
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Profiladatok betöltése
+  loadProfileData();
+  
+  // Események kezelése
+  setupProfileEventHandlers();
+  
+  logDebug("Profil oldal betöltve");
+}
+
+// Profil események kezelése
+function setupProfileEventHandlers() {
+  // Profil form mentése
+  document.getElementById('profile-form').addEventListener('submit', handleProfileSave);
+
+  // Avatar szín változás
+  document.getElementById('avatar-color').addEventListener('change', (e) => {
+    updateAvatarPreview(e.target.value);
+  });
+
+  // Avatar előnézet inicializálása
+  initializeAvatarPreview();
+}
+
+// Profil adatok betöltése
+async function loadProfileData() {
+  try {
+    const userId = auth.currentUser.uid;
+    const doc = await db.collection('users').doc(userId).get();
+    
+    if (!doc.exists) {
+      throw new Error('Felhasználói adatok nem találhatók');
+    }
+
+    const userData = doc.data();
+    logDebug("Felhasználói adatok betöltve", userData);
+
+    // Avatar szín beállítása
+    document.getElementById('avatar-color').value = userData.avatarColor || '#4CAF50';
+    updateAvatarPreview(userData.avatarColor);
+
+  } catch (error) {
+    logError("Hiba a profiladatok betöltésekor", error);
+    showToast('Nem sikerült betölteni a profiladatokat', 'error');
+  }
+}
+
+// Avatar előnézet inicializálása
+function initializeAvatarPreview() {
+  const preview = document.querySelector('.avatar-preview');
+  const user = auth.currentUser;
+  
+  if (preview && user) {
+    preview.textContent = user.displayName ? 
+      user.displayName.charAt(0).toUpperCase() : 
+      '?';
+  }
+}
+
+// Avatar előnézet frissítése
+function updateAvatarPreview(color) {
+  const preview = document.querySelector('.avatar-preview');
+  if (preview) {
+    preview.style.backgroundColor = color;
+  }
+}
+
+// Profil mentése
+async function handleProfileSave(e) {
+  e.preventDefault();
+  
+  const form = e.target;
+  const formData = new FormData(form);
+  const updates = {
+    displayName: formData.get('displayName'),
+    avatarColor: formData.get('avatarColor'),
+    lastModified: window.fbDb.Timestamp.now()
+  };
+
+  try {
+    const user = auth.currentUser;
+    
+    // Firebase Auth név frissítése
+    await user.updateProfile({
+      displayName: updates.displayName
+    });
+    
+    // Firestore adatok frissítése
+    await db.collection('users').doc(user.uid).update(updates);
+    
+    logInfo("Profil sikeresen mentve", updates);
+    showToast('Profil mentve', 'success');
+  } catch (error) {
+    logError("Hiba a profil mentésekor", error);
+    showToast('Nem sikerült menteni a profilt', 'error');
+  }
+}
+
+// Email cím módosítása
+function showChangeEmailModal() {
+  showModal({
+    title: 'Email cím módosítása',
+    content: `
+      <form id="change-email-form" class="auth-form">
+        <div class="form-group">
+          <label for="new-email">Új email cím</label>
+          <input type="email" 
+                 id="new-email" 
+                 placeholder="pelda@email.com" 
+                 required>
+        </div>
+        <div class="form-group">
+          <label for="current-password">Jelenlegi jelszó</label>
+          <input type="password" 
+                 id="current-password" 
+                 placeholder="Jelszó" 
+                 required>
+        </div>
+      </form>
+    `,
+    buttons: [
+      {
+        text: 'Módosítás',
+        type: 'primary',
+        onClick: handleEmailChange
+      },
+      {
+        text: 'Mégse',
+        type: 'secondary',
+        onClick: hideModal
+      }
+    ]
+  });
+}
+
+// Email cím módosítás végrehajtása
+async function handleEmailChange() {
+  const newEmail = document.getElementById('new-email').value;
+  const password = document.getElementById('current-password').value;
+  
+  try {
+    const user = auth.currentUser;
+    const credential = firebase.auth.EmailAuthProvider.credential(
+      user.email, 
+      password
+    );
+    
+    // Újrahitelesítés
+    await user.reauthenticateWithCredential(credential);
+    
+    // Email módosítása
+    await user.updateEmail(newEmail);
+    
+    // Firestore frissítése
+    await db.collection('users').doc(user.uid).update({
+      email: newEmail,
+      lastModified: window.fbDb.Timestamp.now()
+    });
+    
+    hideModal();
+    logInfo("Email cím sikeresen módosítva");
+    showToast('Email cím módosítva', 'success');
+  } catch (error) {
+    logError("Hiba az email cím módosításakor", error);
+    let errorMessage = 'Nem sikerült módosítani az email címet';
+    
+    switch(error.code) {
+      case 'auth/wrong-password':
+        errorMessage = 'Hibás jelszó';
+        break;
+      case 'auth/email-already-in-use':
+        errorMessage = 'Ez az email cím már használatban van';
+        break;
+      case 'auth/invalid-email':
+        errorMessage = 'Érvénytelen email cím';
+        break;
+    }
+    
+    showToast(errorMessage, 'error');
+  }
+}
+
+// Jelszó módosítása
+function showChangePasswordModal() {
+  showModal({
+    title: 'Jelszó módosítása',
+    content: `
+      <form id="change-password-form" class="auth-form">
+        <div class="form-group">
+          <label for="current-password">Jelenlegi jelszó</label>
+          <input type="password" 
+                 id="current-password" 
+                 placeholder="Jelenlegi jelszó" 
+                 required>
+        </div>
+        <div class="form-group">
+          <label for="new-password">Új jelszó</label>
+          <input type="password" 
+                 id="new-password" 
+                 placeholder="Új jelszó" 
+                 required 
+                 minlength="6">
+        </div>
+        <div class="form-group">
+          <label for="confirm-password">Új jelszó megerősítése</label>
+          <input type="password" 
+                 id="confirm-password" 
+                 placeholder="Új jelszó újra" 
+                 required 
+                 minlength="6">
+        </div>
+      </form>
+    `,
+    buttons: [
+      {
+        text: 'Módosítás',
+        type: 'primary',
+        onClick: handlePasswordChange
+      },
+      {
+        text: 'Mégse',
+        type: 'secondary',
+        onClick: hideModal
+      }
+    ]
+  });
+}
+
+// Jelszó módosítás végrehajtása
+async function handlePasswordChange() {
+  const currentPassword = document.getElementById('current-password').value;
+  const newPassword = document.getElementById('new-password').value;
+  const confirmPassword = document.getElementById('confirm-password').value;
+  
+  if (newPassword !== confirmPassword) {
+    showToast('Az új jelszavak nem egyeznek', 'error');
+    return;
+  }
+  
+  try {
+    const user = auth.currentUser;
+    const credential = firebase.auth.EmailAuthProvider.credential(
+      user.email, 
+      currentPassword
+    );
+    
+    // Újrahitelesítés
+    await user.reauthenticateWithCredential(credential);
+    
+    // Jelszó módosítása
+    await user.updatePassword(newPassword);
+    
+    hideModal();
+    logInfo("Jelszó sikeresen módosítva");
+    showToast('Jelszó módosítva', 'success');
+  } catch (error) {
+    logError("Hiba a jelszó módosításakor", error);
+    let errorMessage = 'Nem sikerült módosítani a jelszót';
+    
+    switch(error.code) {
+      case 'auth/wrong-password':
+        errorMessage = 'Hibás jelenlegi jelszó';
+        break;
+      case 'auth/weak-password':
+        errorMessage = 'Az új jelszó túl gyenge';
+        break;
+    }
+    
+    showToast(errorMessage, 'error');
+  }
+}
+
+// Fiók törlése
+function handleAccountDelete() {
+  showModal({
+    title: 'Fiók törlése',
+    content: `
+      <div class="warning-message">
+        <h4>⚠️ Figyelmeztetés</h4>
+        <p>A fiók törlése véglegesen eltávolítja az összes adatodat és nem visszavonható!</p>
+        <form id="delete-account-form" class="auth-form">
+          <div class="form-group">
+            <label for="confirm-password">Jelszó megerősítése</label>
+            <input type="password" 
+                   id="confirm-password" 
+                   placeholder="Add meg a jelszavad" 
+                   required>
+          </div>
+          <div class="form-group">
+            <label class="checkbox-container">
+              <input type="checkbox" 
+                     id="confirm-delete" 
+                     required>
+              <span>Megértettem, hogy ez a művelet nem visszavonható</span>
+            </label>
+          </div>
+        </form>
+      </div>
+    `,
+    buttons: [
+      {
+        text: 'Fiók törlése',
+        type: 'danger',
+        onClick: handleAccountDeleteConfirm
+      },
+      {
+        text: 'Mégse',
+        type: 'secondary',
+        onClick: hideModal
+      }
+    ]
+  });
+}
+
+// Fiók törlés végrehajtása
+async function handleAccountDeleteConfirm() {
+  const password = document.getElementById('confirm-password').value;
+  const isConfirmed = document.getElementById('confirm-delete').checked;
+  
+  if (!isConfirmed) {
+    showToast('Kérlek erősítsd meg a törlési szándékot', 'error');
+    return;
+  }
+  
+  try {
+    const user = auth.currentUser;
+    const credential = firebase.auth.EmailAuthProvider.credential(
+      user.email, 
+      password
+    );
+    
+    // Újrahitelesítés
+    await user.reauthenticateWithCredential(credential);
+    
+    // Felhasználói adatok törlése
+    const batch = db.batch();
+    
+    // Jegyzetek törlése
+    const notesSnapshot = await db.collection('notes')
+      .where('userId', '==', user.uid)
+      .get();
+    notesSnapshot.forEach(doc => {
+      batch.delete(doc.ref);
+    });
+    
+    // Időpontok törlése
+    const appointmentsSnapshot = await db.collection('appointments')
+      .where('userId', '==', user.uid)
+      .get();
+    appointmentsSnapshot.forEach(doc => {
+      batch.delete(doc.ref);
+    });
+    
+    // Felhasználói dokumentum törlése
+    batch.delete(db.collection('users').doc(user.uid));
+    
+    await batch.commit();
+    
+    // Firebase Auth fiók törlése
+    await user.delete();
+    
+    hideModal();
+    logInfo("Felhasználói fiók sikeresen törölve");
+    showToast('Fiók törölve', 'success');
+    
+    // Átirányítás a kezdőoldalra
+    window.location.reload();
+  } catch (error) {
+    logError("Hiba a fiók törlésekor", error);
+    let errorMessage = 'Nem sikerült törölni a fiókot';
+    
+    if (error.code === 'auth/wrong-password') {
+      errorMessage = 'Hibás jelszó';
+    }
+    
+    showToast(errorMessage, 'error');
+  }
+}
+
+// Toast üzenet megjelenítése
+function showToast(message, type = 'info') {
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+  toast.textContent = message;
+  
+  document.body.appendChild(toast);
+  
+  // Animáció
+  requestAnimationFrame(() => {
+    toast.classList.add('visible');
+  });
+  
+  // Automatikus eltűnés
+  setTimeout(() => {
+    toast.classList.remove('visible');
+    setTimeout(() => {
+      toast.remove();
+    }, 300);
+  }, 3000);
+}
