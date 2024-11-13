@@ -110,7 +110,7 @@ async function initApp() {
   showLoginForm();
   
   // Majd figyeljük a bejelentkezési státuszt
-  auth.onAuthStateChanged(async (user) => {
+  window.fbAuth.onAuthStateChanged(async (user) => {
     if (user) {
       logInfo("Felhasználó bejelentkezve", { email: user.email });
       
