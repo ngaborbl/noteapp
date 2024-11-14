@@ -9,77 +9,73 @@ const firebaseConfig = {
   measurementId: "G-3NSSJ1FT7S"
 };
 
-// Firebase inicializálása előtt beállítjuk a persistence-t
 const initializeFirebase = async () => {
   try {
     // Firebase inicializálása
     const app = firebase.initializeApp(firebaseConfig);
-
-    // Auth inicializálása
-    const auth = firebase.auth();
     
-    // Firestore inicializálása
+    // Auth és Firestore inicializálása
+    const auth = firebase.auth();
     const db = firebase.firestore();
     
-    // Firebase beállítások
-    const settings = {
+    // Új Firestore beállítások a persistence warning elkerüléséhez
+    db.settings({
       cacheSizeBytes: firebase.firestore.CACHE_SIZE_UNLIMITED,
-      merge: true
-    };
-    db.settings(settings);
+      cache: {
+        enable: true,
+        persistenceEnabled: true,
+        synchronizeTabs: true
+      }
+    });
 
-    // Persistence beállítása
-    try {
-      await db.enablePersistence({
-        synchronizeTabs: true,
-        cache: {
-          enable: true
-        }
-      });
-      console.log("Offline persistence sikeresen engedélyezve");
-    } catch (err) {
-      if (err.code === 'failed-precondition') {
-        console.warn("Persistence nem engedélyezhető több megnyitott tab esetén");
-      } else if (err.code === 'unimplemented') {
-        console.warn("A böngésző nem támogatja a persistence funkciót");
+    // Messaging inicializálása error handling-gel
+    let messaging = null;
+    if ('Notification' in window) {
+      try {
+        messaging = firebase.messaging();
+      } catch (err) {
+        console.warn("Messaging inicializálási hiba:", err.message);
       }
     }
 
-    // Messaging inicializálása
-    let messaging = null;
-    try {
-      messaging = firebase.messaging();
-      // A requestPermission hívást kivesszük innen
-    } catch (err) {
-      console.warn("Messaging nem inicializálható:", err);
-    }
-
     // Globális változók beállítása
-    window.fbApp = app;
-    window.fbDb = db;
-    window.fbAuth = auth;
-    window.fbMessaging = messaging;
+    Object.assign(window, {
+      fbApp: app,
+      fbDb: db,
+      fbAuth: auth,
+      fbMessaging: messaging
+    });
 
     console.log("Firebase sikeresen inicializálva");
     return true;
+
   } catch (error) {
-    console.error("Hiba a Firebase inicializálásakor:", error);
+    console.error("Firebase inicializálási hiba:", error);
     return false;
   }
 };
 
-// Firebase inicializálása és alkalmazás indítása
+// Alkalmazás indítása jobb error handling-gel
 document.addEventListener('DOMContentLoaded', async () => {
   try {
-    const success = await initializeFirebase();
-    if (success && typeof window.initApp === 'function') {
-      await window.initApp();
-    } else if (!success) {
-      console.error("Az alkalmazás nem tudott elindulni a Firebase inicializálási hiba miatt");
-    } else {
-      console.error("initApp függvény nem található");
+    if (!await initializeFirebase()) {
+      throw new Error("Firebase inicializálás sikertelen");
     }
+    
+    if (typeof window.initApp !== 'function') {
+      throw new Error("initApp függvény nem található");
+    }
+    
+    await window.initApp();
+    
   } catch (error) {
-    console.error("Hiba az alkalmazás indításakor:", error);
+    console.error("Alkalmazás indítási hiba:", error.message);
+    // Itt lehetne valami felhasználóbarát hibaüzenetet megjeleníteni
+    document.body.innerHTML = `
+      <div class="error-container">
+        <h1>Hiba történt</h1>
+        <p>Az alkalmazás nem tudott elindulni. Kérjük, próbálja újra később.</p>
+      </div>
+    `;
   }
 });

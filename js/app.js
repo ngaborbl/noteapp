@@ -1702,6 +1702,23 @@ async function deleteAppointment(appointmentId) {
   });
 }
 
+// Időpont szerkesztése
+async function editAppointment(appointmentId) {
+  try {
+    const doc = await db.collection('appointments').doc(appointmentId).get();
+    if (!doc.exists) {
+      throw new Error('Időpont nem található');
+    }
+    
+    const appointment = doc.data();
+    showEditAppointmentModal(appointmentId, appointment); 
+    
+  } catch (error) {
+    logError("Hiba az időpont szerkesztésekor", error);
+    alert('Nem sikerült betölteni az időpontot');
+  }
+}
+
 // Időpontok szűrése
 function filterAppointments(searchTerm, filter = 'all') {
   const appointments = document.querySelectorAll('.appointment-card');
