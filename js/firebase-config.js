@@ -31,7 +31,10 @@ const initializeFirebase = async () => {
     // Persistence beállítása
     try {
       await db.enablePersistence({
-        synchronizeTabs: true
+        synchronizeTabs: true,
+        cache: {
+          enable: true
+        }
       });
       console.log("Offline persistence sikeresen engedélyezve");
     } catch (err) {
@@ -46,7 +49,7 @@ const initializeFirebase = async () => {
     let messaging = null;
     try {
       messaging = firebase.messaging();
-      await messaging.requestPermission();
+      // A requestPermission hívást kivesszük innen
     } catch (err) {
       console.warn("Messaging nem inicializálható:", err);
     }
@@ -67,14 +70,16 @@ const initializeFirebase = async () => {
 
 // Firebase inicializálása és alkalmazás indítása
 document.addEventListener('DOMContentLoaded', async () => {
-  const success = await initializeFirebase();
-  if (success) {
-    if (typeof window.initApp === 'function') {
-      window.initApp();
+  try {
+    const success = await initializeFirebase();
+    if (success && typeof window.initApp === 'function') {
+      await window.initApp();
+    } else if (!success) {
+      console.error("Az alkalmazás nem tudott elindulni a Firebase inicializálási hiba miatt");
     } else {
       console.error("initApp függvény nem található");
     }
-  } else {
-    console.error("Az alkalmazás nem tudott elindulni a Firebase inicializálási hiba miatt");
+  } catch (error) {
+    console.error("Hiba az alkalmazás indításakor:", error);
   }
 });

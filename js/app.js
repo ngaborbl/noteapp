@@ -2,12 +2,35 @@
 import { notificationManager } from './notifications.js';
 import { createAppointmentElement, showEditAppointmentModal } from './ui-utils.js';
 
-// Exportálás a globális scope-ba
-window.initApp = initApp;
+// Az összes globálisan szükséges függvényt exportáljuk
+export { 
+  initApp,
+  showLoginForm,
+  showRegistrationForm, 
+  showForgotPasswordForm,
+  handleLogin,
+  handleRegistration,
+  handleForgotPassword,
+  handleLogout,
+  togglePasswordVisibility,
+  showModule,
+  showModal,
+  hideModal,
+  showConfirmModal,
+  editAppointment,
+  deleteAppointment,
+  showChangeEmailModal,
+  showChangePasswordModal,
+  handleAccountDelete,
+  resetSettings
+};
 
 // Firebase szolgáltatások elérése a globális változókon keresztül
 const db = window.fbDb;
 const auth = window.fbAuth;
+
+// Az initApp függvényt külön exportáljuk, hogy a window objektumon is elérhető legyen
+window.initApp = initApp;
 
 // Naplózási konfiguráció
 const logConfig = {
