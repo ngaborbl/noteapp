@@ -1,10 +1,13 @@
 // Import ES6 module szintaxissal
-import { notificationManager } from './notifications.js';
+// notificationManager már globálisan elérhető a window objektumon keresztül
 import { createAppointmentElement, showEditAppointmentModal } from './ui-utils.js';
 
+// Globális notificationManager referencia
+const notificationManager = window.notificationManager;
+
 // Az összes globálisan szükséges függvényt exportáljuk
+// Megjegyzés: initApp később exportálódik mint async function
 export { 
-  initApp,
   showLoginForm,
   showRegistrationForm, 
   showForgotPasswordForm,
@@ -22,15 +25,18 @@ export {
   showChangeEmailModal,
   showChangePasswordModal,
   handleAccountDelete,
-  resetSettings
+  resetSettings,
+  toggleNoteComplete,
+  deleteNoteQuick,
+  editNoteInline,
+  cancelNoteEdit,
+  saveNoteEdit,
+  deleteAppointmentQuick
 };
 
 // Firebase szolgáltatások elérése a globális változókon keresztül
-const db = window.fbDb;
-const auth = window.fbAuth;
-
-// Az initApp függvényt külön exportáljuk, hogy a window objektumon is elérhető legyen
-window.initApp = initApp;
+// Ezeket az initApp függvényben inicializáljuk
+let auth, db;
 
 // Naplózási konfiguráció
 const logConfig = {
@@ -106,6 +112,11 @@ function getTimestamp() {
 // Alkalmazás inicializálása
 export async function initApp() {
   logDebug("Alkalmazás inicializálása...");
+  
+  // Firebase szolgáltatások inicializálása
+  auth = window.fbAuth;
+  db = window.fbDb;
+  
   const navElement = document.querySelector('nav');
   if (navElement) {
     navElement.style.display = 'none';
@@ -163,8 +174,8 @@ async function handleLogin(e) {
   
   try {
     // Persistence beállítása
-    await window.fbAuth.setPersistence(
-      rememberMe ? 'local' : 'session'
+    await auth.setPersistence(
+      rememberMe ? firebase.auth.Auth.Persistence.LOCAL : firebase.auth.Auth.Persistence.SESSION
     );
     
     // Bejelentkezés
@@ -175,7 +186,7 @@ async function handleLogin(e) {
     
     // Utolsó bejelentkezés frissítése Firestore-ban
     await db.collection('users').doc(userCredential.user.uid).update({
-      lastLogin: window.fbDb.serverTimestamp()
+      lastLogin: firebase.firestore.FieldValue.serverTimestamp()
     });
 
     logInfo("Sikeres bejelentkezés", { 
@@ -369,15 +380,6 @@ function showLoginForm() {
           <button type="submit" class="auth-button">Bejelentkezés</button>
         </form>
 
-        <div class="auth-links">
-          <button onclick="showForgotPasswordForm()" class="text-button">
-            Elfelejtett jelszó?
-          </button>
-          <button onclick="showRegistrationForm()" class="text-button">
-            Regisztráció
-          </button>
-        </div>
-
         <div id="auth-error" class="auth-error"></div>
       </div>
     </div>
@@ -522,6 +524,9 @@ function showModule(moduleId) {
   const contentElement = document.getElementById('content');
   cleanupModules();
   contentElement.innerHTML = '';
+  
+  // Bottom navigation aktív állapot frissítése
+  updateBottomNavActive(moduleId);
 
   switch(moduleId) {
     case 'dashboard':
@@ -543,6 +548,18 @@ function showModule(moduleId) {
       contentElement.innerHTML = `<h2>${moduleId.charAt(0).toUpperCase() + moduleId.slice(1)}</h2>
                                 <p>Ez a ${moduleId} modul tartalma.</p>`;
   }
+}
+
+// Bottom navigation aktív állapot frissítése
+function updateBottomNavActive(moduleId) {
+  const bottomNavItems = document.querySelectorAll('.bottom-nav-item');
+  bottomNavItems.forEach(item => {
+    if (item.dataset.page === moduleId) {
+      item.classList.add('active');
+    } else {
+      item.classList.remove('active');
+    }
+  });
 }
 
 function initUserAvatar() {
@@ -587,7 +604,7 @@ function initUserAvatar() {
     });
 }
 
-// Dashboard betöltése
+// Dashboard betöltése - PÁRKAPCSOLATI/CSALÁDI VERZIÓ
 function loadDashboard() {
   logDebug("Dashboard betöltése kezdődik");
   
@@ -600,120 +617,40 @@ function loadDashboard() {
   const contentElement = document.getElementById('content');
   contentElement.innerHTML = `
     <div class="dashboard-container">
-      <!-- User Welcome Section -->
-      <div class="user-welcome-section">
-        <div class="user-info">
-          <div id="user-avatar" class="user-avatar"></div>
-          <div class="user-details">
-            <h2>${user.displayName || 'Üdvözlünk!'}</h2>
-            <p class="last-login">Utolsó bejelentkezés: ${
-              user.metadata.lastSignInTime ? 
-              new Date(user.metadata.lastSignInTime).toLocaleString('hu-HU') : 
-              'Nem elérhető'
-            }</p>
-          </div>
-        </div>
-      </div>
-
-      <!-- Quick Actions -->
-      <div class="quick-actions">
-        <button onclick="showModule('notes')" class="action-button">
-          <i class="note-icon"></i>
-          Új jegyzet
-        </button>
-        <button onclick="showModule('appointments')" class="action-button">
-          <i class="calendar-icon"></i>
-          Új időpont
-        </button>
-        <button onclick="showModule('settings')" class="action-button">
-          <i class="settings-icon"></i>
-          Beállítások
-        </button>
-      </div>
       
-      <!-- Statisztikai kártyák -->
-      <div class="stats-grid">
-        <div class="stat-card">
-          <h4>Jegyzetek száma</h4>
-          <div id="notes-count">Betöltés...</div>
-          <div class="stat-trend" id="notes-trend"></div>
-        </div>
-        <div class="stat-card">
-          <h4>Mai időpontok</h4>
-          <div id="today-appointments">Betöltés...</div>
-          <div class="stat-trend" id="appointments-trend"></div>
-        </div>
-        <div class="stat-card">
-          <h4>Következő időpont</h4>
-          <div id="next-appointment">Betöltés...</div>
-        </div>
+      <!-- Gyors gombok - KÖZPONTOZVA -->
+      <div class="quick-actions-center">
+        <button onclick="showModule('notes')" class="action-btn-primary">
+          + Új jegyzet
+        </button>
+        <button onclick="showModule('appointments')" class="action-btn-primary">
+          + Új időpont
+        </button>
       </div>
 
-      <!-- Keresés és szűrés -->
-      <div class="dashboard-controls">
-        <div class="search-box">
-          <input type="text" 
-                 id="dashboard-search" 
-                 placeholder="Keresés jegyzetek és időpontok között..."
-                 autocomplete="off">
-          <button class="clear-search" id="clear-search">×</button>
+      <!-- Közös jegyzetek (Todo lista stílus) -->
+      <div class="shared-section">
+        <div class="section-header-simple">
+          <h3>📝 Közös jegyzetek</h3>
+          <span class="item-count" id="notes-count">0</span>
         </div>
-        <select id="dashboard-filter">
-          <option value="all">Minden elem</option>
-          <option value="notes">Csak jegyzetek</option>
-          <option value="appointments">Csak időpontok</option>
-        </select>
+        <div id="shared-notes-list" class="todo-list"></div>
       </div>
 
-      <div class="dashboard-grid">
-        <!-- Jegyzetek szekció -->
-        <div class="dashboard-card">
-          <div class="card-header">
-            <h3>Legutóbbi Jegyzetek</h3>
-            <select id="notes-sort">
-              <option value="newest">Legújabb elől</option>
-              <option value="oldest">Legrégebbi elől</option>
-            </select>
-          </div>
-          <ul id="recent-notes-list" class="animated-list"></ul>
-          <button onclick="showModule('notes')" class="view-all-btn">
-            Összes jegyzet
-          </button>
+      <!-- Közös időpontok -->
+      <div class="shared-section">
+        <div class="section-header-simple">
+          <h3>📅 Közelgő időpontok</h3>
+          <span class="item-count" id="appointments-count">0</span>
         </div>
-
-        <!-- Időpontok szekció -->
-        <div class="dashboard-card">
-          <div class="card-header">
-            <h3>Közelgő Időpontok</h3>
-            <select id="appointments-range">
-              <option value="today">Mai nap</option>
-              <option value="week">Következő 7 nap</option>
-              <option value="month">Következő 30 nap</option>
-            </select>
-          </div>
-          <ul id="upcoming-appointments-list" class="animated-list"></ul>
-          <button onclick="showModule('appointments')" class="view-all-btn">
-            Összes időpont
-          </button>
-        </div>
+        <div id="shared-appointments-list" class="appointments-list"></div>
       </div>
     </div>
   `;
 
-  // User avatar inicializálása
-  initUserAvatar();
-  
-  // Keresés törlő gomb kezelése
-  document.getElementById('clear-search').addEventListener('click', () => {
-    document.getElementById('dashboard-search').value = '';
-    filterDashboardItems('');
-  });
-
-  // Dashboard komponensek betöltése
-  loadDashboardStats();
-  loadRecentNotes();
-  loadUpcomingAppointments();
-  setupDashboardEvents();
+  // Jegyzetek és időpontok betöltése
+  loadSharedNotes();
+  loadSharedAppointments();
   
   logDebug("Dashboard betöltése befejezve");
 }
@@ -929,8 +866,8 @@ function loadDashboardStats() {
   tomorrow.setDate(tomorrow.getDate() + 1);
 
   const todayAppointmentsQuery = db.collection('appointments')
-    .where('date', '>=', window.fbDb.Timestamp.fromDate(today))
-    .where('date', '<', window.fbDb.Timestamp.fromDate(tomorrow));
+    .where('date', '>=', firebase.firestore.Timestamp.fromDate(today))
+    .where('date', '<', firebase.firestore.Timestamp.fromDate(tomorrow));
 
   window.statsUnsubscribe.push(
     todayAppointmentsQuery.onSnapshot(snapshot => {
@@ -940,7 +877,7 @@ function loadDashboardStats() {
 
   // Következő időpont követése
   const nextAppointmentQuery = db.collection('appointments')
-    .where('date', '>=', window.fbDb.Timestamp.fromDate(new Date()))
+    .where('date', '>=', firebase.firestore.Timestamp.fromDate(new Date()))
     .orderBy('date', 'asc')
     .limit(1);
 
@@ -1033,8 +970,8 @@ function loadUpcomingAppointments(range = 'week') {
   }
 
   const query = db.collection('appointments')
-    .where('date', '>=', window.fbDb.Timestamp.fromDate(now))
-    .where('date', '<=', window.fbDb.Timestamp.fromDate(endDate))
+    .where('date', '>=', firebase.firestore.Timestamp.fromDate(now))
+    .where('date', '<=', firebase.firestore.Timestamp.fromDate(endDate))
     .orderBy('date', 'asc')
     .limit(5);
 
@@ -1068,7 +1005,7 @@ async function setupExistingAppointmentNotifications() {
 
   const now = new Date();
   const query = db.collection('appointments')
-    .where('date', '>', window.fbDb.Timestamp.fromDate(now))
+    .where('date', '>', firebase.firestore.Timestamp.fromDate(now))
     .orderBy('date', 'asc');
 
   try {
@@ -1095,20 +1032,6 @@ function loadNotes() {
     <div class="notes-container">
       <div class="section-header">
         <h2>Jegyzetek</h2>
-        <div class="header-controls">
-          <div class="search-box">
-            <input type="text" 
-                   id="notes-search" 
-                   placeholder="Keresés a jegyzetekben..."
-                   autocomplete="off">
-            <button class="clear-search" id="notes-clear-search">×</button>
-          </div>
-          <select id="notes-filter">
-            <option value="all">Minden jegyzet</option>
-            <option value="recent">Mai jegyzetek</option>
-            <option value="important">Fontos jegyzetek</option>
-          </select>
-        </div>
       </div>
 
       <form id="new-note-form" class="note-form">
@@ -1145,29 +1068,7 @@ function loadNotes() {
 function setupNotesEventHandlers() {
   // Új jegyzet form
   document.getElementById('new-note-form').addEventListener('submit', handleNewNote);
-  
-  // Keresés
-  const searchInput = document.getElementById('notes-search');
-  let searchTimeout;
-  
-  searchInput.addEventListener('input', (e) => {
-    clearTimeout(searchTimeout);
-    const searchTerm = e.target.value.toLowerCase();
-    
-    searchTimeout = setTimeout(() => {
-      logDebug("Jegyzetek keresés", { searchTerm });
-      filterNotes(searchTerm);
-    }, 300);
-  });
-
-  // Keresés törlése
-  document.getElementById('notes-clear-search').addEventListener('click', () => {
-    searchInput.value = '';
-    filterNotes('');
-  });
-
-  // Szűrés
-  document.getElementById('notes-filter').addEventListener('change', (e) => {
+}
     const filter = e.target.value;
     const searchTerm = searchInput.value.toLowerCase();
     logDebug("Jegyzetek szűrő változott", { filter, searchTerm });
@@ -1190,8 +1091,9 @@ async function handleNewNote(e) {
     const noteData = {
       content,
       isImportant,
-      timestamp: window.fbDb.Timestamp.now(),
-      lastModified: window.fbDb.Timestamp.now(),
+      completed: false,
+      timestamp: firebase.firestore.Timestamp.now(),
+      lastModified: firebase.firestore.Timestamp.now(),
       userId: auth.currentUser.uid
     };
     
@@ -1255,7 +1157,7 @@ function loadNotesList() {
     if (snapshot.empty) {
       notesList.innerHTML = `
         <div class="empty-state">
-          <img src="/icons/notes-empty.png" alt="Nincs jegyzet">
+          <img src="/icons/notes-empty.svg" alt="Nincs jegyzet">
           <p>Még nincsenek jegyzetek</p>
         </div>
       `;
@@ -1349,7 +1251,7 @@ async function editNote(noteId) {
               await db.collection('notes').doc(noteId).update({
                 content,
                 isImportant,
-                lastModified: window.fbDb.Timestamp.now()
+                lastModified: firebase.firestore.Timestamp.now()
               });
               
               logInfo("Jegyzet sikeresen frissítve");
@@ -1428,21 +1330,6 @@ function loadAppointments() {
     <div class="appointments-container">
       <div class="section-header">
         <h2>Időpontok</h2>
-        <div class="header-controls">
-          <div class="search-box">
-            <input type="text" 
-                   id="appointments-search" 
-                   placeholder="Keresés az időpontok között..."
-                   autocomplete="off">
-            <button class="clear-search" id="appointments-clear-search">×</button>
-          </div>
-          <select id="appointments-filter">
-            <option value="all">Minden időpont</option>
-            <option value="upcoming">Közelgő</option>
-            <option value="today">Mai</option>
-            <option value="past">Korábbi</option>
-          </select>
-        </div>
       </div>
 
       <form id="new-appointment-form" class="appointment-form">
@@ -1510,27 +1397,7 @@ function setupAppointmentsEventHandlers() {
   // Új időpont form
   document.getElementById('new-appointment-form')
     .addEventListener('submit', handleNewAppointment);
-  
-  // Keresés
-  const searchInput = document.getElementById('appointments-search');
-  let searchTimeout;
-  
-  searchInput.addEventListener('input', (e) => {
-    clearTimeout(searchTimeout);
-    const searchTerm = e.target.value.toLowerCase();
-    
-    searchTimeout = setTimeout(() => {
-      logDebug("Időpontok keresés", { searchTerm });
-      filterAppointments(searchTerm);
-    }, 300);
-  });
-
-  // Keresés törlése
-  document.getElementById('appointments-clear-search').addEventListener('click', () => {
-    searchInput.value = '';
-    filterAppointments('');
-  });
-
+}
   // Szűrés
   document.getElementById('appointments-filter').addEventListener('change', (e) => {
     const filter = e.target.value;
@@ -1573,21 +1440,21 @@ async function handleNewAppointment(e) {
     const appointmentData = {
       title,
       description,
-      date: window.fbDb.Timestamp.fromDate(dateTime),
+      date: firebase.firestore.Timestamp.fromDate(dateTime),
       notifyBefore,
-      timestamp: window.fbDb.Timestamp.now(),
+      timestamp: firebase.firestore.Timestamp.now(),
       userId: auth.currentUser.uid
     };
     
     const docRef = await db.collection('appointments').add(appointmentData);
     
-    // Értesítés beállítása
-    if (notifyBefore > 0) {
-      await notificationManager.scheduleAppointmentNotification({
-        id: docRef.id,
-        ...appointmentData
-      });
-    }
+    // Értesítés beállítása - JELENLEG NEM HASZNÁLJUK
+    // if (notifyBefore > 0) {
+    //   await notificationManager.scheduleAppointmentNotification({
+    //     id: docRef.id,
+    //     ...appointmentData
+    //   });
+    // }
     
     // Form tisztítása
     e.target.reset();
@@ -1662,7 +1529,7 @@ function loadAppointmentsList() {
     if (snapshot.empty) {
       appointmentsList.innerHTML = `
         <div class="empty-state">
-          <img src="/icons/calendar-empty.png" alt="Nincs időpont">
+          <img src="/icons/calendar-empty.svg" alt="Nincs időpont">
           <p>Még nincsenek időpontok</p>
         </div>
       `;
@@ -2057,7 +1924,7 @@ async function handleSettingsSave(e) {
     dataSync: formData.get('dataSync') === 'on',
     autoLogout: formData.get('autoLogout'),
     debugMode: formData.get('debugMode') === 'on',
-    lastModified: window.fbDb.Timestamp.now()
+    lastModified: firebase.firestore.Timestamp.now()
   };
 
   try {
@@ -2086,7 +1953,7 @@ async function resetSettings() {
     dataSync: true,
     autoLogout: '0',
     debugMode: false,
-    lastModified: window.fbDb.Timestamp.now()
+    lastModified: firebase.firestore.Timestamp.now()
   };
 
   try {
@@ -2187,6 +2054,18 @@ function loadProfile() {
             Fiók törlése
           </button>
         </div>
+        
+        <!-- Mobil menü gombok (csak mobilon) -->
+        <div class="mobile-menu-actions">
+          <button onclick="showModule('settings')" 
+                  class="secondary-button full-width">
+            ⚙️ Beállítások
+          </button>
+          <button onclick="handleLogout()" 
+                  class="secondary-button full-width">
+            🚪 Kijelentkezés
+          </button>
+        </div>
       </div>
     </div>
   `;
@@ -2266,7 +2145,7 @@ async function handleProfileSave(e) {
   const updates = {
     displayName: formData.get('displayName'),
     avatarColor: formData.get('avatarColor'),
-    lastModified: window.fbDb.Timestamp.now()
+    lastModified: firebase.firestore.Timestamp.now()
   };
 
   try {
@@ -2346,7 +2225,7 @@ async function handleEmailChange() {
     // Firestore frissítése
     await db.collection('users').doc(user.uid).update({
       email: newEmail,
-      lastModified: window.fbDb.Timestamp.now()
+      lastModified: firebase.firestore.Timestamp.now()
     });
     
     hideModal();
@@ -2589,4 +2468,301 @@ function showToast(message, type = 'info') {
       toast.remove();
     }, 300);
   }, 3000);
+}
+// ========================================
+// KÖZÖS JEGYZETEK ÉS IDŐPONTOK (Dashboard)
+// ========================================
+
+// Közös jegyzetek betöltése (Todo lista stílus)
+function loadSharedNotes() {
+  const notesList = document.getElementById('shared-notes-list');
+  if (!notesList) return;
+  
+  // Firestore listener - MINDEN felhasználó jegyzetét mutatja
+  const query = db.collection('notes')
+    .orderBy('timestamp', 'desc')
+    .limit(10);
+  
+  query.onSnapshot(snapshot => {
+    notesList.innerHTML = '';
+    
+    if (snapshot.empty) {
+      notesList.innerHTML = '<p class="empty-message">Még nincsenek közös jegyzetek</p>';
+      document.getElementById('notes-count').textContent = '0';
+      return;
+    }
+    
+    document.getElementById('notes-count').textContent = snapshot.size;
+    
+    snapshot.forEach(doc => {
+      const note = { id: doc.id, ...doc.data() };
+      notesList.appendChild(createTodoItem(note));
+    });
+  });
+}
+
+// Todo item létrehozása (checkbox-szal)
+function createTodoItem(note) {
+  const item = document.createElement('div');
+  item.className = 'todo-item' + (note.completed ? ' completed' : '');
+  item.dataset.id = note.id;
+  
+  item.innerHTML = `
+    <input type="checkbox" 
+           class="todo-checkbox" 
+           ${note.completed ? 'checked' : ''}
+           onchange="toggleNoteComplete('${note.id}', this.checked)">
+    <div class="todo-content" onclick="editNoteInline('${note.id}')">
+      <div class="todo-text">${escapeHtml(note.content)}</div>
+      <div class="todo-meta">
+        ${new Date(note.timestamp.toDate()).toLocaleDateString('hu-HU', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+      </div>
+    </div>
+    <button class="todo-delete" onclick="deleteNoteQuick('${note.id}')" title="Törlés">×</button>
+  `;
+  
+  return item;
+}
+
+// Jegyzetek kipipálása (elvégezve)
+async function toggleNoteComplete(noteId, completed) {
+  try {
+    await db.collection('notes').doc(noteId).update({
+      completed: completed,
+      lastModified: firebase.firestore.Timestamp.now()
+    });
+    logInfo("Jegyzet állapot frissítve", { noteId, completed });
+  } catch (error) {
+    logError("Hiba a jegyzet állapot frissítésekor", error);
+  }
+}
+
+// Jegyzet gyors törlése
+async function deleteNoteQuick(noteId) {
+  if (!confirm('Biztosan törölni szeretnéd ezt a jegyzetet?')) return;
+  
+  try {
+    await db.collection('notes').doc(noteId).delete();
+    logInfo("Jegyzet törölve", { noteId });
+  } catch (error) {
+    logError("Hiba a jegyzet törlésekor", error);
+  }
+}
+
+// Jegyzet inline szerkesztése
+function editNoteInline(noteId) {
+  const noteElement = document.querySelector(`[data-id="${noteId}"]`);
+  if (!noteElement) return;
+  
+  const contentDiv = noteElement.querySelector('.todo-content');
+  const textElement = contentDiv.querySelector('.todo-text');
+  const currentText = textElement.textContent;
+  
+  // Szerkesztő container
+  const editContainer = document.createElement('div');
+  editContainer.className = 'todo-edit-container';
+  
+  // Textarea
+  const textarea = document.createElement('textarea');
+  textarea.value = currentText;
+  textarea.className = 'todo-edit-textarea';
+  textarea.rows = 3;
+  
+  // Gombok container
+  const buttonsDiv = document.createElement('div');
+  buttonsDiv.className = 'todo-edit-buttons';
+  
+  // Mentés gomb
+  const saveBtn = document.createElement('button');
+  saveBtn.textContent = 'Mentés';
+  saveBtn.className = 'todo-save-btn';
+  saveBtn.onclick = () => saveNoteEdit(noteId, textarea.value, contentDiv, currentText);
+  
+  // Mégse gomb
+  const cancelBtn = document.createElement('button');
+  cancelBtn.textContent = 'Mégse';
+  cancelBtn.className = 'todo-cancel-btn';
+  cancelBtn.onclick = () => cancelNoteEdit(contentDiv, currentText);
+  
+  // Desktop billentyűzet támogatás
+  textarea.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey && window.innerWidth > 768) {
+      e.preventDefault();
+      saveBtn.click();
+    }
+    if (e.key === 'Escape') {
+      cancelBtn.click();
+    }
+  });
+  
+  // Összerakás
+  buttonsDiv.appendChild(saveBtn);
+  buttonsDiv.appendChild(cancelBtn);
+  editContainer.appendChild(textarea);
+  editContainer.appendChild(buttonsDiv);
+  
+  // Csere és fókusz (kurzor a végére)
+  contentDiv.replaceWith(editContainer);
+  textarea.focus();
+  textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+}
+
+// Szerkesztés megszakítása
+function cancelNoteEdit(originalContentDiv, originalText) {
+  const editContainer = document.querySelector('.todo-edit-container');
+  if (!editContainer) return;
+  
+  const contentDiv = document.createElement('div');
+  contentDiv.className = 'todo-content';
+  contentDiv.onclick = () => editNoteInline(originalContentDiv.parentElement.dataset.id);
+  
+  const textDiv = document.createElement('div');
+  textDiv.className = 'todo-text';
+  textDiv.textContent = originalText;
+  
+  const metaDiv = editContainer.parentElement.querySelector('.todo-meta');
+  if (metaDiv) {
+    contentDiv.appendChild(textDiv);
+    contentDiv.appendChild(metaDiv.cloneNode(true));
+  } else {
+    contentDiv.appendChild(textDiv);
+  }
+  
+  editContainer.replaceWith(contentDiv);
+}
+
+// Jegyzet szerkesztés mentése
+async function saveNoteEdit(noteId, newText, originalContentDiv, originalText) {
+  const trimmedText = newText.trim();
+  
+  // Üres vagy nem változott -> Mégse
+  if (!trimmedText || trimmedText === originalText) {
+    cancelNoteEdit(originalContentDiv, originalText);
+    return;
+  }
+  
+  try {
+    // Firestore frissítés
+    await db.collection('notes').doc(noteId).update({
+      content: trimmedText,
+      lastModified: firebase.firestore.Timestamp.now()
+    });
+    
+    logInfo("Jegyzet frissítve", { noteId });
+    
+    // Szerkesztő bezárása - a Firestore listener frissíti az UI-t
+    const editContainer = document.querySelector('.todo-edit-container');
+    if (editContainer) {
+      editContainer.remove();
+    }
+    
+  } catch (error) {
+    logError("Hiba a jegyzet frissítésekor", error);
+    alert('Nem sikerült frissíteni a jegyzetet');
+    cancelNoteEdit(originalContentDiv, originalText);
+  }
+}
+
+// Közös időpontok betöltése
+function loadSharedAppointments() {
+  const appointmentsList = document.getElementById('shared-appointments-list');
+  if (!appointmentsList) return;
+  
+  const now = new Date();
+  const query = db.collection('appointments')
+    .where('date', '>=', firebase.firestore.Timestamp.fromDate(now))
+    .orderBy('date', 'asc')
+    .limit(5);
+  
+  query.onSnapshot(snapshot => {
+    appointmentsList.innerHTML = '';
+    
+    if (snapshot.empty) {
+      appointmentsList.innerHTML = '<p class="empty-message">Nincsenek közelgő időpontok</p>';
+      document.getElementById('appointments-count').textContent = '0';
+      return;
+    }
+    
+    document.getElementById('appointments-count').textContent = snapshot.size;
+    
+    snapshot.forEach(doc => {
+      const appointment = { id: doc.id, ...doc.data() };
+      appointmentsList.appendChild(createAppointmentItem(appointment));
+    });
+  });
+}
+
+// Időpont item létrehozása
+function createAppointmentItem(appt) {
+  const item = document.createElement('div');
+  item.className = 'appointment-item-simple';
+  
+  const date = appt.date.toDate();
+  const dateStr = date.toLocaleDateString('hu-HU', { month: 'short', day: 'numeric' });
+  const timeStr = date.toLocaleTimeString('hu-HU', { hour: '2-digit', minute: '2-digit' });
+  
+  item.innerHTML = `
+    <div class="appointment-date-badge">
+      <div class="badge-day">${date.getDate()}</div>
+      <div class="badge-month">${dateStr.split(' ')[0]}</div>
+    </div>
+    <div class="appointment-info">
+      <div class="appointment-title-simple">${escapeHtml(appt.title)}</div>
+      <div class="appointment-time-simple">🕐 ${timeStr}</div>
+    </div>
+    <div class="appointment-actions">
+      <button class="appointment-edit-btn" onclick="editAppointment('${appt.id}')" title="Szerkesztés">✏️</button>
+      <button class="appointment-delete-btn" onclick="deleteAppointmentQuick('${appt.id}')" title="Törlés">×</button>
+    </div>
+  `;
+  
+  return item;
+}
+
+// Gyors jegyzet létrehozás modal
+function showCreateNoteModal() {
+  const content = prompt('Új jegyzet tartalma:');
+  if (!content || !content.trim()) return;
+  
+  db.collection('notes').add({
+    content: content.trim(),
+    completed: false,
+    timestamp: firebase.firestore.Timestamp.now(),
+    lastModified: firebase.firestore.Timestamp.now(),
+    userId: auth.currentUser.uid
+  }).then(() => {
+    logInfo("Gyors jegyzet létrehozva");
+  }).catch(error => {
+    logError("Hiba a jegyzet létrehozásakor", error);
+    alert('Nem sikerült létrehozni a jegyzetet');
+  });
+}
+
+// Gyors időpont létrehozás modal
+function showCreateAppointmentModal() {
+  showModule('appointments');
+}
+
+// HTML escape segédfüggvény
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// ========================================
+// IDŐPONT GYORS TÖRLÉS
+// ========================================
+
+// Időpont gyors törlése
+async function deleteAppointmentQuick(appointmentId) {
+  if (!confirm('Biztosan törölni szeretnéd ezt az időpontot?')) return;
+  
+  try {
+    await db.collection('appointments').doc(appointmentId).delete();
+    logInfo("Időpont törölve", { appointmentId });
+  } catch (error) {
+    logError("Hiba az időpont törlésekor", error);
+    alert('Nem sikerült törölni az időpontot');
+  }
 }

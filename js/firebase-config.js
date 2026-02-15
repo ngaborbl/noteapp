@@ -18,24 +18,34 @@ const initializeFirebase = async () => {
     const auth = firebase.auth();
     const db = firebase.firestore();
     
-    // Új Firestore beállítások a persistence warning elkerüléséhez
-    db.settings({
-      cacheSizeBytes: firebase.firestore.CACHE_SIZE_UNLIMITED,
-      cache: {
-        enable: true,
-        persistenceEnabled: true,
+    // Firestore offline persistence engedélyezése (új szintaxis Firebase v10-hez)
+    try {
+      await db.enablePersistence({
         synchronizeTabs: true
+      });
+      console.log("Firestore persistence engedélyezve");
+    } catch (err) {
+      if (err.code === 'failed-precondition') {
+        console.warn("Firestore persistence: több tab nyitva");
+      } else if (err.code === 'unimplemented') {
+        console.warn("Firestore persistence: böngésző nem támogatja");
+      } else {
+        console.warn("Firestore persistence hiba:", err);
       }
-    });
+    }
 
-    // Messaging inicializálása error handling-gel
+    // Messaging inicializálása jobb error handling-gel
     let messaging = null;
-    if ('Notification' in window) {
+    if ('Notification' in window && 'serviceWorker' in navigator) {
       try {
         messaging = firebase.messaging();
+        console.log("Firebase Messaging inicializálva");
       } catch (err) {
         console.warn("Messaging inicializálási hiba:", err.message);
+        // Ez nem kritikus hiba, az app működhet értesítések nélkül is
       }
+    } else {
+      console.warn("Értesítések nem támogatottak ebben a böngészőben");
     }
 
     // Globális változók beállítása

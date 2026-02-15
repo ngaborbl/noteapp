@@ -657,3 +657,885 @@ const loginStyles = `
   background-color: #45a049;
 }
 `;
+/* ========================================
+   BOTTOM NAVIGATION (MobilOnly)
+   ======================================== */
+
+.bottom-nav {
+  display: none; /* Desktop-on rejtve */
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: #fff;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  padding-bottom: env(safe-area-inset-bottom); /* iOS notch support */
+}
+
+.bottom-nav-container {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 0;
+}
+
+.bottom-nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 0;
+  text-decoration: none;
+  color: #757575;
+  transition: all 0.2s ease;
+  position: relative;
+  min-height: 56px; /* Material Design spec */
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent; /* iOS tap highlight eltávolítása */
+}
+
+.bottom-nav-item:active {
+  transform: scale(0.95);
+}
+
+.bottom-nav-icon {
+  width: 24px;
+  height: 24px;
+  margin-bottom: 4px;
+  filter: grayscale(100%);
+  opacity: 0.7;
+  transition: all 0.2s ease;
+}
+
+.bottom-nav-label {
+  font-size: 12px;
+  font-weight: 500;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+/* Aktív menüpont stílusa */
+.bottom-nav-item.active {
+  color: #4CAF50;
+}
+
+.bottom-nav-item.active .bottom-nav-icon {
+  filter: grayscale(0%);
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+.bottom-nav-item.active .bottom-nav-label {
+  font-weight: 600;
+}
+
+/* Ripple effect (opcionális) */
+.bottom-nav-item::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background-color: rgba(76, 175, 80, 0.2);
+  transform: translate(-50%, -50%);
+  transition: width 0.3s, height 0.3s;
+}
+
+.bottom-nav-item:active::before {
+  width: 100%;
+  height: 100%;
+}
+
+/* Mobil nézet (< 768px) */
+@media (max-width: 768px) {
+  .bottom-nav {
+    display: block;
+  }
+  
+  /* Top navigáció elrejtése mobilon */
+  header nav {
+    display: none !important;
+  }
+  
+  /* Main padding alulról a bottom nav miatt */
+  main {
+    padding-bottom: 80px; /* Bottom nav magasság + extra padding */
+  }
+  
+  /* Header kompaktabb mobilon */
+  .header-top {
+    padding: 0.75rem 1rem;
+  }
+  
+  header h1 {
+    font-size: 1.25rem;
+  }
+}
+
+/* Tablet nézet (768px - 1024px) */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .bottom-nav {
+    display: none;
+  }
+  
+  /* Top navigáció látható tablet-en */
+  header nav {
+    display: flex !important;
+  }
+}
+
+/* Desktop nézet (> 1024px) */
+@media (min-width: 1024px) {
+  .bottom-nav {
+    display: none;
+  }
+  
+  header nav {
+    display: flex !important;
+  }
+}
+
+/* iOS Safe Area támogatás */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .bottom-nav {
+    padding-bottom: calc(env(safe-area-inset-bottom) + 8px);
+  }
+}
+
+/* Footer elrejtése mobilon (bottom nav miatt) */
+@media (max-width: 768px) {
+  footer {
+    display: none;
+  }
+}
+
+/* Mobile menu actions (Profil oldalon) */
+.mobile-menu-actions {
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 30px;
+  padding-top: 30px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.full-width {
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  .mobile-menu-actions {
+    display: flex;
+  }
+}
+
+/* ========================================
+   DASHBOARD MOBIL OPTIMALIZÁLÁS
+   ======================================== */
+
+/* Mobil nézet (< 768px) */
+@media (max-width: 768px) {
+  
+  /* User Welcome Section - kompaktabb */
+  .user-welcome-section {
+    padding: 15px !important;
+  }
+  
+  .user-info {
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 12px !important;
+  }
+  
+  .user-avatar {
+    width: 50px !important;
+    height: 50px !important;
+    font-size: 20px !important;
+  }
+  
+  .user-details h2 {
+    font-size: 18px !important;
+    margin-bottom: 2px !important;
+  }
+  
+  .user-details .last-login {
+    font-size: 12px !important;
+  }
+  
+  /* Quick Actions - Inline kompakt gombok */
+  .quick-actions {
+    display: flex !important;
+    gap: 8px !important;
+    padding: 10px 15px !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .action-button {
+    flex: 0 0 auto !important;
+    padding: 8px 16px !important;
+    font-size: 13px !important;
+    white-space: nowrap !important;
+    min-width: auto !important;
+  }
+  
+  /* Statisztikai kártyák - KOMPAKT INLINE */
+  .stats-grid {
+    display: flex !important;
+    gap: 8px !important;
+    padding: 10px 15px !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x mandatory;
+  }
+  
+  .stat-card {
+    flex: 0 0 auto !important;
+    min-width: 140px !important;
+    padding: 12px !important;
+    scroll-snap-align: start;
+  }
+  
+  .stat-card h4 {
+    font-size: 11px !important;
+    margin-bottom: 6px !important;
+    opacity: 0.7;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  
+  .stat-card > div:not(.stat-trend) {
+    font-size: 24px !important;
+    font-weight: 700 !important;
+    color: #4CAF50;
+  }
+  
+  .stat-trend {
+    font-size: 10px !important;
+    margin-top: 4px !important;
+  }
+  
+  /* Dashboard kontrolok - kompaktabb */
+  .dashboard-controls {
+    padding: 10px 15px !important;
+    gap: 8px !important;
+  }
+  
+  .search-box {
+    flex: 1 !important;
+  }
+  
+  .search-box input {
+    font-size: 14px !important;
+    padding: 10px 35px 10px 12px !important;
+  }
+  
+  #dashboard-filter {
+    font-size: 13px !important;
+    padding: 10px !important;
+  }
+  
+  /* Dashboard grid - egyszeres oszlop */
+  .dashboard-grid {
+    grid-template-columns: 1fr !important;
+    gap: 15px !important;
+    padding: 0 15px 15px 15px !important;
+  }
+  
+  /* Dashboard kártyák */
+  .dashboard-card {
+    padding: 15px !important;
+  }
+  
+  .card-header {
+    margin-bottom: 12px !important;
+  }
+  
+  .card-header h3 {
+    font-size: 16px !important;
+  }
+  
+  #notes-sort,
+  #appointments-sort {
+    font-size: 12px !important;
+    padding: 6px 8px !important;
+  }
+  
+  /* Recent items lista - kompaktabb */
+  .recent-notes-list,
+  .recent-appointments-list {
+    gap: 10px !important;
+  }
+  
+  /* Note item kompakt */
+  .note-item {
+    padding: 12px !important;
+  }
+  
+  .note-content {
+    font-size: 14px !important;
+    line-height: 1.4 !important;
+  }
+  
+  .note-meta {
+    font-size: 11px !important;
+    margin-top: 6px !important;
+  }
+  
+  /* Appointment item kompakt */
+  .appointment-item {
+    padding: 12px !important;
+  }
+  
+  .appointment-title {
+    font-size: 15px !important;
+  }
+  
+  .appointment-time {
+    font-size: 12px !important;
+  }
+  
+  .appointment-description {
+    font-size: 13px !important;
+  }
+}
+
+/* Extra kis mobil (< 375px) - pl. iPhone SE */
+@media (max-width: 375px) {
+  .stat-card {
+    min-width: 120px !important;
+  }
+  
+  .stat-card > div:not(.stat-trend) {
+    font-size: 20px !important;
+  }
+  
+  .action-button {
+    padding: 6px 12px !important;
+    font-size: 12px !important;
+  }
+}
+
+/* ALTERNATÍV MEGOLDÁS: Ultra kompakt statisztikák mobilon */
+@media (max-width: 768px) {
+  
+  /* Statisztikák - Ultra kompakt inline badge stílus */
+  .stats-grid-compact {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 15px;
+  }
+  
+  .stat-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+    color: white;
+    border-radius: 20px;
+    font-size: 13px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  
+  .stat-badge-icon {
+    font-size: 16px;
+  }
+  
+  .stat-badge-text {
+    font-weight: 600;
+  }
+  
+  .stat-badge-value {
+    background: rgba(255,255,255,0.3);
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 700;
+  }
+}
+
+/* OPCIONÁLIS: Quick Actions elrejtése mobilon (ha túl sok a hely) */
+/* Uncomment az alábbi sort ha el szeretnéd rejteni: */
+
+/*
+@media (max-width: 768px) {
+  .quick-actions {
+    display: none !important;
+  }
+}
+*/
+
+/* Vagy alternatívaként: FAB (Floating Action Button) mobilon */
+.mobile-fab {
+  display: none;
+  position: fixed;
+  bottom: 70px; /* Bottom nav felett */
+  right: 16px;
+  width: 56px;
+  height: 56px;
+  background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+  border-radius: 50%;
+  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
+  border: none;
+  color: white;
+  font-size: 24px;
+  cursor: pointer;
+  z-index: 999;
+  transition: all 0.3s ease;
+}
+
+.mobile-fab:active {
+  transform: scale(0.9);
+}
+
+@media (max-width: 768px) {
+  .mobile-fab {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+/* ========================================
+   ÚJ DASHBOARD - PÁRKAPCSOLATI/CSALÁDI VERZIÓ
+   ======================================== */
+
+/* Dashboard container */
+.dashboard-container {
+  max-width: 100%;
+  padding: 0;
+  margin: 0;
+}
+
+/* Gyors gombok - KÖZPONTOZVA */
+.quick-actions-center {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  padding: 15px;
+  background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+}
+
+.action-btn-primary {
+  flex: 1;
+  max-width: 180px;
+  padding: 14px 20px;
+  background: white;
+  color: #4CAF50;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  transition: all 0.2s ease;
+}
+
+.action-btn-primary:active {
+  transform: scale(0.95);
+}
+
+/* Közös szekciók */
+.shared-section {
+  padding: 15px;
+  margin-bottom: 10px;
+}
+
+.section-header-simple {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+.section-header-simple h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+}
+
+.item-count {
+  background: #4CAF50;
+  color: white;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+/* Todo lista stílus */
+.todo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.todo-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.todo-item:active {
+  transform: scale(0.98);
+}
+
+.todo-item.completed {
+  opacity: 0.6;
+  background: #f5f5f5;
+}
+
+.todo-item.completed .todo-text {
+  text-decoration: line-through;
+  color: #999;
+}
+
+.todo-checkbox {
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.todo-content {
+  flex: 1;
+  cursor: pointer;
+}
+
+.todo-text {
+  font-size: 15px;
+  color: #333;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.todo-meta {
+  font-size: 12px;
+  color: #999;
+  margin-top: 4px;
+}
+
+.todo-delete {
+  width: 32px;
+  height: 32px;
+  background: #ff5252;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  font-size: 20px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.todo-delete:active {
+  transform: scale(0.9);
+}
+
+/* Időpontok lista */
+.appointments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.appointment-item-simple {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-left: 4px solid #4CAF50;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.appointment-item-simple:active {
+  transform: scale(0.98);
+}
+
+.appointment-date-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 50px;
+  height: 50px;
+  background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+  color: white;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.badge-day {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.badge-month {
+  font-size: 10px;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
+.appointment-info {
+  flex: 1;
+}
+
+.appointment-title-simple {
+  font-size: 15px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 4px;
+}
+
+.appointment-time-simple {
+  font-size: 13px;
+  color: #666;
+}
+
+.appointment-edit-btn {
+  width: 36px;
+  height: 36px;
+  background: #4CAF50;
+  border: none;
+  border-radius: 50%;
+  font-size: 16px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.appointment-edit-btn:active {
+  transform: scale(0.9);
+}
+
+/* Üres állapot üzenetek */
+.empty-message {
+  text-align: center;
+  padding: 30px 15px;
+  color: #999;
+  font-size: 14px;
+}
+
+/* Mobil optimalizálás */
+@media (max-width: 768px) {
+  .action-btn-primary {
+    font-size: 14px;
+    padding: 12px 16px;
+  }
+  
+  .shared-section {
+    padding: 12px;
+  }
+  
+  .section-header-simple h3 {
+    font-size: 15px;
+  }
+  
+  .todo-item,
+  .appointment-item-simple {
+    padding: 10px;
+  }
+  
+  .todo-text,
+  .appointment-title-simple {
+    font-size: 14px;
+  }
+}
+
+/* Inline szerkesztés - Textarea */
+.todo-edit-textarea {
+  width: 100%;
+  padding: 8px;
+  border: 2px solid #4CAF50;
+  border-radius: 4px;
+  font-size: 14px;
+  font-family: inherit;
+  line-height: 1.4;
+  resize: vertical;
+  background: #fffef0;
+  outline: none;
+  box-shadow: 0 2px 8px rgba(76, 175, 80, 0.2);
+}
+
+.todo-edit-textarea:focus {
+  border-color: #45a049;
+  box-shadow: 0 2px 12px rgba(76, 175, 80, 0.3);
+}
+
+/* ========================================
+   MOBILOS INLINE SZERKESZTÉS - GOMBOK
+   ======================================== */
+
+/* Szerkesztő container */
+.todo-edit-container {
+  width: 100%;
+}
+
+/* Textarea (már létező, de frissítve) */
+.todo-edit-textarea {
+  width: 100%;
+  padding: 10px;
+  border: 2px solid #4CAF50;
+  border-radius: 8px 8px 0 0; /* Csak felül lekerekített */
+  font-size: 15px;
+  font-family: inherit;
+  line-height: 1.5;
+  resize: vertical;
+  background: #fffef0;
+  outline: none;
+  box-shadow: 0 2px 8px rgba(76, 175, 80, 0.2);
+  margin-bottom: 0;
+  min-height: 80px;
+}
+
+.todo-edit-textarea:focus {
+  border-color: #45a049;
+  box-shadow: 0 2px 12px rgba(76, 175, 80, 0.3);
+}
+
+/* Gombok container */
+.todo-edit-buttons {
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+  background: #f5f5f5;
+  border: 2px solid #4CAF50;
+  border-top: none;
+  border-radius: 0 0 8px 8px; /* Csak alul lekerekített */
+}
+
+/* Mentés gomb */
+.todo-save-btn {
+  flex: 1;
+  padding: 12px;
+  background: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.todo-save-btn:active {
+  transform: scale(0.95);
+  background: #45a049;
+}
+
+/* Mégse gomb */
+.todo-cancel-btn {
+  flex: 1;
+  padding: 12px;
+  background: #f5f5f5;
+  color: #666;
+  border: 2px solid #ddd;
+  border-radius: 6px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.todo-cancel-btn:active {
+  transform: scale(0.95);
+  background: #e0e0e0;
+}
+
+/* Mobil optimalizálás */
+@media (max-width: 768px) {
+  .todo-edit-textarea {
+    font-size: 16px; /* iOS zoom elkerülése */
+    min-height: 100px;
+  }
+  
+  .todo-save-btn,
+  .todo-cancel-btn {
+    padding: 14px;
+    font-size: 16px;
+    min-height: 48px; /* Touch-friendly */
+  }
+}
+
+/* ========================================
+   IDŐPONT TÖRLÉS GOMB
+   ======================================== */
+
+/* Gombok container az időpontoknál */
+.appointment-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* Szerkesztés gomb (már létező, de frissítve) */
+.appointment-edit-btn {
+  width: 36px;
+  height: 36px;
+  background: #4CAF50;
+  border: none;
+  border-radius: 50%;
+  font-size: 16px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.appointment-edit-btn:active {
+  transform: scale(0.9);
+  background: #45a049;
+}
+
+/* Törlés gomb */
+.appointment-delete-btn {
+  width: 36px;
+  height: 36px;
+  background: #ff5252;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.appointment-delete-btn:active {
+  transform: scale(0.9);
+  background: #e53935;
+}
+
+/* Mobil optimalizálás */
+@media (max-width: 768px) {
+  .appointment-edit-btn,
+  .appointment-delete-btn {
+    width: 40px;
+    height: 40px;
+    font-size: 18px;
+  }
+  
+  .appointment-delete-btn {
+    font-size: 26px;
+  }
+}

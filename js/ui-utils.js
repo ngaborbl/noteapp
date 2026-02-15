@@ -161,15 +161,15 @@ export function showEditAppointmentModal(appointmentId, appointment) {
 
             await window.fbDb.collection('appointments').doc(appointmentId).update(updatedData);
 
-            // Értesítés frissítése
-            if (notifyBefore > 0) {
-              await window.notificationManager.updateAppointmentNotification({
-                id: appointmentId,
-                ...updatedData
-              });
-            } else {
-              await window.notificationManager.cancelNotification(appointmentId);
-            }
+            // Értesítés frissítése - JELENLEG NEM HASZNÁLJUK
+            // if (notifyBefore > 0) {
+            //   await window.notificationManager.updateAppointmentNotification({
+            //     id: appointmentId,
+            //     ...updatedData
+            //   });
+            // } else {
+            //   await window.notificationManager.cancelNotification(appointmentId);
+            // }
 
             window.hideModal();
             console.info("Időpont sikeresen frissítve", { appointmentId });

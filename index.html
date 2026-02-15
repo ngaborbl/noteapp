@@ -37,10 +37,6 @@
                 <img src="icons/profile.png" alt="Profil" class="nav-icon">
                 Profil
             </a>
-            <a href="#" id="admin-menu" class="nav-item">
-                <img src="icons/admin.png" alt="Admin" class="nav-icon">
-                Admin
-            </a>
             <a href="#" id="logout-menu" class="nav-item">
                 <img src="icons/logout.png" alt="Kijelentkezés" class="nav-icon">
                 Kijelentkezés
@@ -50,8 +46,30 @@
 
     <main id="content" role="main"></main>
 
+    <!-- Bottom Navigation (Mobile Only) -->
+    <nav class="bottom-nav">
+        <div class="bottom-nav-container">
+            <a href="#" id="bottom-dashboard" class="bottom-nav-item" data-page="dashboard">
+                <img src="icons/dashboard.png" alt="" class="bottom-nav-icon">
+                <span class="bottom-nav-label">Főoldal</span>
+            </a>
+            <a href="#" id="bottom-notes" class="bottom-nav-item" data-page="notes">
+                <img src="icons/note.png" alt="" class="bottom-nav-icon">
+                <span class="bottom-nav-label">Jegyzetek</span>
+            </a>
+            <a href="#" id="bottom-appointments" class="bottom-nav-item" data-page="appointments">
+                <img src="icons/calendar.png" alt="" class="bottom-nav-icon">
+                <span class="bottom-nav-label">Időpontok</span>
+            </a>
+            <a href="#" id="bottom-profile" class="bottom-nav-item" data-page="profile">
+                <img src="icons/profile.png" alt="" class="bottom-nav-icon">
+                <span class="bottom-nav-label">Profil</span>
+            </a>
+        </div>
+    </nav>
+
     <footer>
-        <p>© 2024 NoteApp PWA v1.88 - Nagy Gábor</p>
+        <p>© 2026 NoteApp PWA v1.96 - Nagy Gábor</p>
     </footer>
 
     <!-- Firebase -->
@@ -62,6 +80,7 @@
 
     <!-- App Scripts -->
     <script src="js/firebase-config.js"></script>
+    <script src="js/notifications.js"></script>
     <script type="module" src="js/app-init.js"></script>
 </body>
 </html>

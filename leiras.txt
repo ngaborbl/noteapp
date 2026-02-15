@@ -1,0 +1,92 @@
+Elkészítek egy átfogó projekt összefoglalót, hogy könnyen folytatható legyen a munka:
+markdownCopy# NoteApp PWA Projekt Összefoglaló
+
+## Projekt Adatok
+- Név: NoteApp PWA
+- Verzió: v1.95 (Időpont törlés gomb - 2026-02-14)
+- GitHub: noteapp-mu-nine.vercel.app
+- Firebase Projekt: noteapp-5c98e
+
+## Fájlszerkezet
+```text
+noteapp-pwa/
+├── js/
+│   ├── app.js           # Fő alkalmazás logika
+│   ├── app-init.js      # Inicializálás és eseménykezelők
+│   ├── firebase-config.js # Firebase konfiguráció
+│   ├── notifications.js # Értesítések kezelése
+│   └── ui-utils.js      # UI segédfüggvények
+├── css/
+│   └── style.css       # Stílusok
+├── icons/              # Alkalmazás ikonok
+├── index.html          # Fő HTML fájl
+├── manifest.json       # PWA manifest
+└── service-worker.js   # Service Worker
+
+Firebase Konfiguráció
+javascriptCopyconst firebaseConfig = {
+  apiKey: "AIzaSyBsQMs29I_kwN5idgcyAdz0etWfv7ymyz8",
+  authDomain: "noteapp-5c98e.firebaseapp.com",
+  projectId: "noteapp-5c98e",
+  storageBucket: "noteapp-5c98e.appspot.com",
+  messagingSenderId: "10607490745",
+  appId: "1:10607490745:web:5cdff4c9c5e78d7c798d68",
+  measurementId: "G-3NSSJ1FT7S"
+};
+
+Jelenlegi Funkciók
+
+Autentikáció (bejelentkezés, regisztráció)
+Jegyzetek kezelése
+Időpontok kezelése
+Értesítések (Firebase Cloud Messaging)
+Offline működés (IndexedDB)
+PWA funkcionalitás
+
+Implementált Modulok
+
+Autentikáció
+Jegyzetek CRUD
+Időpontok CRUD
+Dashboard
+Beállítások
+Profil
+Értesítések
+
+Fejlesztés alatt álló/Tervezett funkciók
+
+FCM értesítések javítása
+Több tab szinkronizáció
+Offline mode optimalizálás
+UI/UX fejlesztések
+
+Ismert Problémák
+
+FCM token beszerzési hiba
+Persistence warning Firebase-től
+Module loading problémák
+
+Függőségek
+
+Firebase v10.8.0
+Használt Firebase szolgáltatások:
+
+Authentication
+Firestore
+Cloud Messaging
+
+
+
+Fontos Megjegyzések
+
+Az alkalmazás ES6 modulokat használ
+A Firebase compat (compatibility) verzióját használjuk
+PWA támogatással rendelkezik
+Magyar nyelvű felhasználói felület
+
+Következő Lépések
+
+Firebase Messaging problémák javítása
+Kód refaktorálás
+UI/UX fejlesztések
+Tesztek implementálása

@@ -6,15 +6,20 @@ class NotificationManager {
         this.pendingNotifications = new Map();
         this.retryAttempts = 3;
         this.vapidKey = "knDCQxYIDpfB9UONeHF2E_VIUup6XTH__TkBIIvz31w";
-        this.messaging = window.fbMessaging;
-        this.db = window.fbDb;
-        this.auth = window.fbAuth;
+        this.messaging = null; // Később inicializáljuk
+        this.db = null;
+        this.auth = null;
     }
 
     async initialize() {
         if (this.initialized) return true;
 
         try {
+            // Referenciák beállítása
+            this.messaging = window.fbMessaging;
+            this.db = window.fbDb;
+            this.auth = window.fbAuth;
+
             if (!("Notification" in window)) {
                 console.warn("This browser does not support notifications");
                 return false;
@@ -29,18 +34,26 @@ class NotificationManager {
             this.swRegistration = await navigator.serviceWorker.register('/service-worker.js');
             console.log("Service Worker registered successfully");
 
-            // Initialize Firebase Messaging if available
-            try {
-                const token = await window.fbMessaging.getToken({
-                    vapidKey: this.vapidKey,
-                    serviceWorkerRegistration: this.swRegistration
-                });
-                
-                if (token) {
-                    await this.updateUserFCMToken(token);
+            // Initialize Firebase Messaging csak ha elérhető
+            if (this.messaging) {
+                try {
+                    const token = await this.messaging.getToken({
+                        vapidKey: this.vapidKey,
+                        serviceWorkerRegistration: this.swRegistration
+                    });
+                    
+                    if (token) {
+                        console.log("FCM token beszerzése sikeres:", token);
+                        await this.updateUserFCMToken(token);
+                    } else {
+                        console.warn("FCM token beszerzése sikertelen - nincs engedély");
+                    }
+                } catch (error) {
+                    console.error("Failed to get FCM token:", error);
+                    // Az alkalmazás tovább működhet értesítések nélkül is
                 }
-            } catch (error) {
-                console.error("Failed to initialize Firebase Messaging:", error);
+            } else {
+                console.warn("Firebase Messaging nem elérhető - értesítések korlátozottak");
             }
 
             this.initialized = true;
@@ -194,6 +207,12 @@ class NotificationManager {
     }
 }
 
-// Export singleton instance
-const notificationManager = new NotificationManager();
-export { notificationManager };
+// Globális példány létrehozása (nem ES6 module export)
+if (typeof window !== 'undefined') {
+    window.notificationManager = new NotificationManager();
+}
+
+// Export csak ha támogatott (backwards compatibility)
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { NotificationManager };
+}

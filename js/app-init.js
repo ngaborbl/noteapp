@@ -32,10 +32,17 @@ import {
   showChangeEmailModal,
   showChangePasswordModal,
   handleAccountDelete,
-  resetSettings
+  resetSettings,
+  toggleNoteComplete,
+  deleteNoteQuick,
+  editNoteInline,
+  cancelNoteEdit,
+  saveNoteEdit,
+  deleteAppointmentQuick
 } from './app.js';
 
 // Globális függvények exportálása a window objektumra
+window.initApp = initApp;  // FONTOS: Ez kell hogy a firebase-config.js meghívhassa
 window.showLoginForm = showLoginForm;
 window.showRegistrationForm = showRegistrationForm;
 window.showForgotPasswordForm = showForgotPasswordForm;
@@ -54,6 +61,12 @@ window.showChangeEmailModal = showChangeEmailModal;
 window.showChangePasswordModal = showChangePasswordModal;
 window.handleAccountDelete = handleAccountDelete;
 window.resetSettings = resetSettings;
+window.toggleNoteComplete = toggleNoteComplete;
+window.deleteNoteQuick = deleteNoteQuick;
+window.editNoteInline = editNoteInline;
+window.cancelNoteEdit = cancelNoteEdit;
+window.saveNoteEdit = saveNoteEdit;
+window.deleteAppointmentQuick = deleteAppointmentQuick;
 
 // Navigation események kezelése
 document.querySelectorAll('.nav-item').forEach(navItem => {
@@ -74,7 +87,38 @@ document.addEventListener('DOMContentLoaded', () => {
       handleLogout();
     });
   }
+  
+  // Bottom Navigation események (mobil)
+  setupBottomNavigation();
 });
+
+// Bottom Navigation inicializálása
+function setupBottomNavigation() {
+  const bottomNavItems = document.querySelectorAll('.bottom-nav-item');
+  
+  bottomNavItems.forEach(item => {
+    item.addEventListener('click', (e) => {
+      e.preventDefault();
+      
+      const page = e.currentTarget.dataset.page;
+      
+      // Aktív állapot kezelése
+      bottomNavItems.forEach(navItem => navItem.classList.remove('active'));
+      e.currentTarget.classList.add('active');
+      
+      // Oldal betöltése
+      if (window.showModule) {
+        window.showModule(page);
+      }
+    });
+  });
+  
+  // Alapértelmezett aktív oldal beállítása (dashboard)
+  const dashboardItem = document.querySelector('[data-page="dashboard"]');
+  if (dashboardItem) {
+    dashboardItem.classList.add('active');
+  }
+}
 
 // Debug mód kezelése
 const isDebugMode = localStorage.getItem('debugMode') === 'true' || 
@@ -87,11 +131,14 @@ if (isDebugMode) {
 }
 
 // PWA telepítés kezelése
+let deferredPrompt;
 window.addEventListener('beforeinstallprompt', (e) => {
-  // Prevent Chrome 67 and earlier from automatically showing the prompt
+  // Megakadályozzuk az automatikus megjelenítést
+  // és eltároljuk későbbi manuális használatra
   e.preventDefault();
-  // Stash the event so it can be triggered later.
+  deferredPrompt = e;
   window.deferredInstallPrompt = e;
+  console.log('PWA telepítési prompt késleltetve - manuálisan megjeleníthető');
 });
 
 // Offline/Online állapot kezelése

@@ -52,6 +52,12 @@ self.addEventListener('activate', (event) => {
 
 // Fetch események kezelése cache-eléssel
 self.addEventListener('fetch', (event) => {
+  // Csak http és https protokollokat cache-eljük
+  const url = new URL(event.request.url);
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request)
       .then((response) => {
@@ -73,7 +79,10 @@ self.addEventListener('fetch', (event) => {
 
             caches.open(CACHE_NAME)
               .then((cache) => {
-                cache.put(event.request, responseToCache);
+                // Csak http/https URL-eket cache-elünk
+                if (event.request.url.startsWith('http')) {
+                  cache.put(event.request, responseToCache);
+                }
               })
               .catch(error => {
                 console.error('Cache írási hiba:', error);
