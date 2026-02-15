@@ -184,10 +184,25 @@ async function handleLogin(e) {
     // "Emlékezz rám" beállítás mentése
     localStorage.setItem('rememberMe', rememberMe);
     
-    // Utolsó bejelentkezés frissítése Firestore-ban
-    await db.collection('users').doc(userCredential.user.uid).update({
-      lastLogin: firebase.firestore.FieldValue.serverTimestamp()
-    });
+    // User dokumentum ellenőrzése/létrehozása
+    const userRef = db.collection('users').doc(userCredential.user.uid);
+    const userDoc = await userRef.get();
+    
+    if (!userDoc.exists) {
+      // Létrehozzuk ha nem létezik
+      await userRef.set({
+        email: userCredential.user.email,
+        displayName: userCredential.user.displayName || null,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        lastLogin: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      logInfo("User dokumentum létrehozva", { userId: userCredential.user.uid });
+    } else {
+      // Frissítjük ha létezik
+      await userRef.update({
+        lastLogin: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }
 
     logInfo("Sikeres bejelentkezés", { 
       userId: userCredential.user.uid,
