@@ -1,3 +1,5 @@
+// DEVELOPMENT MODE - localhost esetén kikapcsoljuk a cache-t
+const IS_DEVELOPMENT = self.location.hostname === 'localhost' || self.location.hostname === '127.0.0.1';
 const CACHE_NAME = 'noteapp-cache-v2.0';
 const urlsToCache = [
   '/',
@@ -13,6 +15,13 @@ const urlsToCache = [
 
 // Cache telepítés módosítása
 self.addEventListener('install', (event) => {
+  // Development módban SKIP cache
+  if (IS_DEVELOPMENT) {
+    console.log('🔥 DEVELOPMENT MODE - Cache KIKAPCSOLVA');
+    self.skipWaiting();
+    return;
+  }
+  
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
@@ -52,6 +61,12 @@ self.addEventListener('activate', (event) => {
 
 // Fetch események kezelése cache-eléssel
 self.addEventListener('fetch', (event) => {
+  // Development módban SKIP cache - mindig friss fájlok
+  if (IS_DEVELOPMENT) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+  
   // Csak http és https protokollokat cache-eljük
   const url = new URL(event.request.url);
   if (url.protocol !== 'http:' && url.protocol !== 'https:') {

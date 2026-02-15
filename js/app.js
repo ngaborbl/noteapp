@@ -1398,20 +1398,6 @@ function setupAppointmentsEventHandlers() {
   document.getElementById('new-appointment-form')
     .addEventListener('submit', handleNewAppointment);
 }
-  // Szűrés
-  document.getElementById('appointments-filter').addEventListener('change', (e) => {
-    const filter = e.target.value;
-    const searchTerm = searchInput.value.toLowerCase();
-    logDebug("Időpontok szűrő változott", { filter, searchTerm });
-    filterAppointments(searchTerm, filter);
-  });
-
-  // Minimum dátum beállítása
-  const dateInput = document.getElementById('appointment-date');
-  const today = new Date().toISOString().split('T')[0];
-  dateInput.min = today;
-  dateInput.value = today;
-}
 
 // Új időpont hozzáadása
 async function handleNewAppointment(e) {
