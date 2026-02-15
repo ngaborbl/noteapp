@@ -3,7 +3,7 @@ markdownCopy# NoteApp PWA Projekt Összefoglaló
 
 ## Projekt Adatok
 - Név: NoteApp PWA
-- Verzió: v1.95 (Időpont törlés gomb - 2026-02-14)
+- Verzió: v2.0 - MAJOR RELEASE 🎉 (Push értesítések - 2026-02-14)
 - GitHub: noteapp-mu-nine.vercel.app
 - Firebase Projekt: noteapp-5c98e
 

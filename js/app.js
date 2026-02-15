@@ -1099,6 +1099,12 @@ async function handleNewNote(e) {
     
     await db.collection('notes').add(noteData);
     
+    // Értesítés küldése
+    if (window.simpleNotificationManager && window.simpleNotificationManager.enabled) {
+      const userName = auth.currentUser.displayName || 'Valaki';
+      window.simpleNotificationManager.notifyNewNote(content, userName);
+    }
+    
     // Form tisztítása
     document.getElementById('note-content').value = '';
     document.getElementById('note-important').checked = false;
@@ -2532,6 +2538,17 @@ async function toggleNoteComplete(noteId, completed) {
       lastModified: firebase.firestore.Timestamp.now()
     });
     logInfo("Jegyzet állapot frissítve", { noteId, completed });
+    
+    // Értesítés ha kipipálták (csak completed = true esetén)
+    if (completed && window.simpleNotificationManager && window.simpleNotificationManager.enabled) {
+      // Jegyzet tartalmának lekérése
+      const noteDoc = await db.collection('notes').doc(noteId).get();
+      if (noteDoc.exists) {
+        const noteData = noteDoc.data();
+        const userName = auth.currentUser.displayName || 'Valaki';
+        window.simpleNotificationManager.notifyNoteCompleted(noteData.content, userName);
+      }
+    }
   } catch (error) {
     logError("Hiba a jegyzet állapot frissítésekor", error);
   }
@@ -2649,6 +2666,12 @@ async function saveNoteEdit(noteId, newText, originalContentDiv, originalText) {
     });
     
     logInfo("Jegyzet frissítve", { noteId });
+    
+    // Értesítés küldése
+    if (window.simpleNotificationManager && window.simpleNotificationManager.enabled) {
+      const userName = auth.currentUser.displayName || 'Valaki';
+      window.simpleNotificationManager.notifyNoteUpdated(trimmedText, userName);
+    }
     
     // Szerkesztő bezárása - a Firestore listener frissíti az UI-t
     const editContainer = document.querySelector('.todo-edit-container');
