@@ -1069,12 +1069,6 @@ function setupNotesEventHandlers() {
   // Új jegyzet form
   document.getElementById('new-note-form').addEventListener('submit', handleNewNote);
 }
-    const filter = e.target.value;
-    const searchTerm = searchInput.value.toLowerCase();
-    logDebug("Jegyzetek szűrő változott", { filter, searchTerm });
-    filterNotes(searchTerm, filter);
-  });
-}
 
 // Új jegyzet hozzáadása
 async function handleNewNote(e) {
