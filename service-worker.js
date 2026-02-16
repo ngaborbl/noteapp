@@ -1,6 +1,6 @@
 // DEVELOPMENT MODE - localhost esetén kikapcsoljuk a cache-t
 const IS_DEVELOPMENT = self.location.hostname === 'localhost' || self.location.hostname === '127.0.0.1';
-const CACHE_NAME = 'noteapp-cache-v2.1';
+const CACHE_NAME = 'noteapp-cache-v2.2.0';
 const urlsToCache = [
   '/',
   '/index.html',
